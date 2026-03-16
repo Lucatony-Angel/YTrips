@@ -1,11 +1,19 @@
 from fastapi import FastAPI
-from app.routers import health
+from app.routers import health, flights
 from app.db.database import Base, engine
-from app.models import User, Trip, TripMember, FlightSearch
+from fastapi.middleware.cors import CORSMiddleware               
+# from app.models import User, Trip, TripMember, FlightSearch
 
 app = FastAPI(title="My API")
-
 app.include_router(health.router)
+app.include_router(flights.router, prefix="/api/flights", tags=["flights"])
+
+app.add_middleware(
+    CORSMiddleware,                                              
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get("/")
 async def root():
