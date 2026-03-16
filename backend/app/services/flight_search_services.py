@@ -65,7 +65,7 @@ def basic_flight_search(origin,
     else:
         data = response.json()["data"]
         offers = data.get("offers", [])
-        return normalize_offer(offers)
+        return [normalize_offer(offer) for offer in offers]
     
 def normalize_offer(offer):
     all_segments = []
