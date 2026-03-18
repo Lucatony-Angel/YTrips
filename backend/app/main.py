@@ -4,9 +4,14 @@ from app.db.database import Base, engine
 from fastapi.middleware.cors import CORSMiddleware               
 # from app.models import User, Trip, TripMember, FlightSearch
 
+from app.routers import trips
+
 app = FastAPI(title="My API")
 app.include_router(health.router)
 app.include_router(flights.router, prefix="/api/flights", tags=["flights"])
+
+# Rishi's Dashboard Creation
+app.include_router(trips.router)
 
 app.add_middleware(
     CORSMiddleware,                                              

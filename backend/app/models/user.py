@@ -1,7 +1,5 @@
-from datetime import datetime, timezone
-from sqlalchemy import JSON
-
-from sqlalchemy import DateTime, Integer, String
+from datetime import datetime, timezone, date
+from sqlalchemy import JSON, Date, DateTime, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.database import Base
