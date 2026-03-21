@@ -7,65 +7,48 @@ from dotenv import load_dotenv
 
 load_dotenv()  # Loads .env file
 
-TOKEN = os.getenv("live_key")
-headers = {
-    "Authorization": f"Bearer {TOKEN}",
-    "Duffel-Version": "v2",
-    "Content-Type": "application/json",
-}
-
-
-# request payload
-default_payload = {
-    "data": {
-    "slices": [
-        {
-        "origin": "JFK",
-        "destination": "LAX",
-        "departure_date": "2026-07-18",
-        }
-    ],
-    "passengers": [{"type": "adult"}],
-    }
-}
-
-
-def basic_flight_search(origin, 
-                        destination, 
-                        departure_date, 
-                        arrival_time=None, 
-                        headers=headers):
-    """
-    Single person, single origin and destination flight search
-    """
-
-    # TODO: Implement Arrive by this time: feature.
+def basic_flight_search(origin, destination, departure_date):
 
     payload = {
         "data": {
-        "slices": [
-            {
-            "origin": origin,
-            "destination": destination,
-            "departure_date": departure_date,
-            }
-        ],
-        "passengers": [{"type": "adult"}],
+            "slices": [
+                {
+                    "origin": origin,
+                    "destination": destination,
+                    "departure_date": departure_date,
+                }
+            ],
+            "passengers": [{"type": "adult"}],
         }
+    }
+
+    env = os.getenv("ENVIRONMENT", "test")
+    if env == "live":
+        token = os.getenv("DUFFEL_LIVE_KEY")
+    else:
+        token = os.getenv("DUFFEL_TEST_KEY")
+
+    if not token:
+        raise RuntimeError("Duffel API key not set")
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Duffel-Version": "v2",
+        "Content-Type": "application/json",
     }
 
     response = requests.post(
         "https://api.duffel.com/air/offer_requests?return_offers=true",
         headers=headers,
-        json=payload
+        json=payload,
     )
+
     if response.status_code not in [200, 201]:
-        print(f"Error: {response.text}")
-        return None
-    else:
-        data = response.json()["data"]
-        offers = data.get("offers", [])
-        return [normalize_offer(offer) for offer in offers]
+        return []
+
+    offers = response.json()["data"].get("offers", [])
+
+    top_offers = offers[:5]  # or 10 if you want
+    return [normalize_offer(o) for o in top_offers]
     
 def normalize_offer(offer):
     all_segments = []
@@ -78,7 +61,6 @@ def normalize_offer(offer):
             all_segments.append({
                 "origin": segment['origin']['iata_code'], # airport code for origin
                 "destination":  segment['destination']['iata_code'], # airport code destination
-                "destination": segment["destination"]["iata_code"],
                 "departing_at": segment["departing_at"],
                 "arriving_at": segment["arriving_at"],
                 "marketing_carrier": (
@@ -93,56 +75,6 @@ def normalize_offer(offer):
         "slices_count": len(offer.get("slices", [])),
         "segments": all_segments,
     }
-
-
-def group_flight_search(origins, destination, departure_date, arrival_window, headers=headers):
-    """
-    Search flights for multiple group members departing from different airports.
-    Works by iterating over each origin, getting flights that arrive in a certain window. 
-    
-    origins: list of IATA codes, e.g. ["JFK", "LAX", "ORD"]
-    destination: single IATA code, e.g. "BCN"
-    departure_date: "YYYY-MM-DD"
-    arrival_window: dict like {"from": "13:00", "to": "15:00"}
-    """
-    results = {} 
-
-    for origin in origins:
-        if origin in results:
-            # this is to avoid repeated calculations for an origin.
-            continue
-        payload = {
-            "data": {
-                "slices": [{
-                    "origin": origin,
-                    "destination": destination,
-                    "departure_date": departure_date,
-                    "arrival_time": arrival_window,
-                }],
-                "passengers": [{"type": "adult"}],
-            }
-        }
-
-        response = requests.post(
-            "https://api.duffel.com/air/offer_requests?return_offers=true",
-            headers=headers,
-            json=payload,
-        )
-
-        if response.status_code not in [200, 201]:
-            print(f"  Error ({response.status_code}): {response.text[:200]}")
-            results[origin] = []
-            continue
-
-        offers = response.json()["data"].get("offers", [])
-        offers = sort_by_arrival(offers)
-        results[origin] = [normalize_offer(off) for off in offers]
-
-        if not offers:
-            print("  No flights found in this window.")
-            continue
-
-    return results
     
 # Sorting functions below: 
 def get_arrival_time(offer):
@@ -153,12 +85,3 @@ def sort_by_arrival(offers):
 
 def sort_by_price(offers):
     return sorted(offers, key=lambda o: float(o["total_amount"]))
-
-if __name__ == '__main__':
-    # basic_flight_search('JFK', 'LAX', '2026-03-07')
-    group_flight_search(
-        origins=["JFK", "LAX", "ORD"],
-        destination="MIA",
-        departure_date="2026-07-18",
-        arrival_window={"from": "13:00", "to": "15:00"},
-    )
