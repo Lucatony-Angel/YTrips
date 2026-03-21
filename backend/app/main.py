@@ -11,7 +11,7 @@ app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 
 app.add_middleware(
     CORSMiddleware,                                              
-    allow_origins=["*"],
+    allow_origins=["*"], # TODO need to update this to the frontend url
     allow_methods=["*"],
     allow_headers=["*"],
 )
