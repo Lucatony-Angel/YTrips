@@ -1,16 +1,17 @@
 from fastapi import FastAPI
-from app.routers import health, flights
+from app.routers import health, flights, auth
 from app.db.database import Base, engine
-from fastapi.middleware.cors import CORSMiddleware               
+from fastapi.middleware.cors import CORSMiddleware
 # from app.models import User, Trip, TripMember, FlightSearch
 
 app = FastAPI(title="My API")
 app.include_router(health.router)
 app.include_router(flights.router, prefix="/api/flights", tags=["flights"])
+app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 
 app.add_middleware(
     CORSMiddleware,                                              
-    allow_origins=["*"],
+    allow_origins=["*"], # TODO need to update this to the frontend url
     allow_methods=["*"],
     allow_headers=["*"],
 )
