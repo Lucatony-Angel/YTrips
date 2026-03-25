@@ -14,6 +14,8 @@ class Trip(Base):
 
     start_date: Mapped[date] = mapped_column(Date, nullable=False)
     end_date: Mapped[date] = mapped_column(Date, nullable=False)
+    arrival_window_start: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    arrival_window_end: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     created_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
