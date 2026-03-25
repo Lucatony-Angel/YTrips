@@ -84,6 +84,7 @@ def get_trip_flights(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    # check membership
     member = db.query(TripMember).filter(
         TripMember.trip_id == trip_id,
         TripMember.user_id == current_user.id,

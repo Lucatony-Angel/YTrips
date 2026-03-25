@@ -1,11 +1,8 @@
-"""
-File to request data from Duffel API
-"""
 import requests
 import os
 from dotenv import load_dotenv
 
-load_dotenv()  # Loads .env file
+load_dotenv()
 
 def basic_flight_search(origin, destination, departure_date):
 
@@ -47,20 +44,17 @@ def basic_flight_search(origin, destination, departure_date):
 
     offers = response.json()["data"].get("offers", [])
 
-    top_offers = offers[:5]  # or 10 if you want
+    top_offers = offers[:5]
     return [normalize_offer(o) for o in top_offers]
     
 def normalize_offer(offer):
     all_segments = []
 
-    # get each slice from the response
     for slice_ in offer.get("slices", []):
         for segment in slice_.get("segments", []):
-            # marketing carrier is the seller flight code, but for codeshare
-            # it will not necessarily show the carrier actually flying it. 
             all_segments.append({
-                "origin": segment['origin']['iata_code'], # airport code for origin
-                "destination":  segment['destination']['iata_code'], # airport code destination
+                "origin": segment['origin']['iata_code'],
+                "destination": segment['destination']['iata_code'],
                 "departing_at": segment["departing_at"],
                 "arriving_at": segment["arriving_at"],
                 "marketing_carrier": (
@@ -76,7 +70,6 @@ def normalize_offer(offer):
         "segments": all_segments,
     }
     
-# Sorting functions below: 
 def get_arrival_time(offer):
     return offer["slices"][0]["segments"][-1]["arriving_at"]
 

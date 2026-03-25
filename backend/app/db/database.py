@@ -18,7 +18,6 @@ engine = create_engine(
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 class Base(DeclarativeBase):
-    # base model for all tables
     pass
 
 def get_db():

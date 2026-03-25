@@ -24,7 +24,7 @@ GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v3/userinfo"
 
 @router.get("/google")
 async def login():
-    """Redirect the user to Google's OAuth consent screen."""
+    # google oauth redirect
     params = urllib.parse.urlencode({
         "client_id": GOOGLE_CLIENT_ID,
         "redirect_uri": GOOGLE_REDIRECT_URI,
@@ -38,10 +38,7 @@ async def login():
 
 @router.get("/google/callback")
 async def callback(code: str = Query(...), db: Session = Depends(get_db)):
-    """
-    Google redirects here after the user consents.
-    Exchange the code for tokens, get user info, upsert user, issue JWT.
-    """
+    # google sends user back here with a code, we swap it for tokens
     async with httpx.AsyncClient() as client:
         token_resp = await client.post(GOOGLE_TOKEN_URL, data={
             "code": code,
@@ -83,7 +80,6 @@ async def callback(code: str = Query(...), db: Session = Depends(get_db)):
 
 @router.get("/me", response_model=UserRead)
 async def me(current_user: User = Depends(get_current_user)):
-    """Return the currently authenticated user's profile."""
     return current_user
 
 
@@ -93,7 +89,6 @@ async def update_home_airport(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Set or update the current user's home airport."""
     current_user.home_airport = body.home_airport.upper()
     db.commit()
     db.refresh(current_user)
