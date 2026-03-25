@@ -43,7 +43,7 @@ export default function JoinTripPage() {
   return (
     <div className="page">
       <Navbar />
-      <div className="onboarding-page">
+      <div className="centered-page">
         <div className="onboarding-card">
           <h1>Join a Trip</h1>
           <p>Enter the invite code shared by your group to join their trip.</p>

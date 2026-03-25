@@ -34,7 +34,7 @@ export default function OnboardingPage() {
   return (
     <div className="page">
       <Navbar />
-      <div className="onboarding-page">
+      <div className="centered-page">
         <div className="onboarding-card">
           <h1>Welcome to YTrips!</h1>
           <p>

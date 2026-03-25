@@ -63,17 +63,14 @@ export default function TripPage() {
           <div className="flight-carrier">{flight.airline}</div>
           <div className="flight-route">
             {flight.departure_airport} → {flight.arrival_airport}
-            <span style={{ marginLeft: 8, color: "var(--subtext)", fontWeight: 500 }}>· {flight.flight_number}</span>
+            <span className="flight-number-tag">· {flight.flight_number}</span>
           </div>
           <div className="flight-times">
             {formatDateTime(flight.departure_time)} → {formatDateTime(flight.arrival_time)}
           </div>
         </div>
         {canDelete && (
-          <button
-            className="btn btn-delete"
-            onClick={() => handleDeleteFlight(flight.id)}
-          >
+          <button className="btn btn-delete" onClick={() => handleDeleteFlight(flight.id)}>
             Delete
           </button>
         )}
@@ -85,13 +82,13 @@ export default function TripPage() {
     <div className="page">
       <Navbar />
       <div className="trip-detail-page">
-        <div className="trip-detail-header">
+        <div className="page-header">
           <div className="trip-detail-header-inner">
             <button className="btn btn-outline btn-back" onClick={() => navigate("/")}>
               ← Back
             </button>
             {loading ? (
-              <p style={{ color: "var(--subtext)" }}>Loading…</p>
+              <p className="text-sub">Loading…</p>
             ) : error ? (
               <p className="error-text">{error}</p>
             ) : (
@@ -110,10 +107,10 @@ export default function TripPage() {
         </div>
 
         {!loading && !error && (
-          <div className="trip-detail-body">
-            <div className="trip-detail-invite card">
+          <div className="page-body">
+            <div className="card">
               <h3>Invite Code</h3>
-              <p style={{ color: "var(--subtext)", fontSize: 14, marginTop: 4, marginBottom: 12 }}>
+              <p className="text-sub mb-md" style={{ marginTop: 4 }}>
                 Share this code with friends so they can join the trip.
               </p>
               <div className="trip-invite" style={{ maxWidth: 360 }}>
@@ -123,8 +120,8 @@ export default function TripPage() {
             </div>
 
             <div className="card">
-              <h3 style={{ marginBottom: 20 }}>Flights</h3>
-              <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+              <h3 className="mb-lg">Flights</h3>
+              <div className="gap-col">
                 {sortedMembers.map((member) => {
                   const isMe = member.user_id === user?.id;
                   const memberFlights = flightByUser[member.user_id] || [];
@@ -137,13 +134,11 @@ export default function TripPage() {
                         {isMe && <span className="trip-badge">You</span>}
                       </div>
                       {memberFlights.length > 0 ? (
-                        <div className="flight-results" style={{ marginTop: 8 }}>
+                        <div className="flight-results mt-sm">
                           {memberFlights.map((f) => <FlightCard key={f.id} flight={f} canDelete={isMe} />)}
                         </div>
                       ) : (
-                        <p style={{ color: "var(--subtext)", fontSize: 14, marginTop: 6 }}>
-                          No flight added yet.
-                        </p>
+                        <p className="text-sub" style={{ marginTop: 6 }}>No flight added yet.</p>
                       )}
                     </div>
                   );
@@ -152,7 +147,7 @@ export default function TripPage() {
             </div>
 
             <div className="card">
-              <h3 style={{ marginBottom: 20 }}>Search &amp; Add Flights</h3>
+              <h3 className="mb-lg">Search &amp; Add Flights</h3>
               <FlightSearch
                 tripId={parseInt(id)}
                 destination={trip.destination_name}
