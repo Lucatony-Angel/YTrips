@@ -1,0 +1,1 @@
+## What each entry in the duffel response means

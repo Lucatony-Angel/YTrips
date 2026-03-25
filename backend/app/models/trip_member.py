@@ -5,7 +5,6 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.database import Base
 
-# connects trips to user
 class TripMember(Base):
     __tablename__ = "trip_members"
 

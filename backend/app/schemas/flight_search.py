@@ -1,10 +1,7 @@
-"""
-Response and requests must meet this format so that they are well-defined and processable
-"""
 from pydantic import BaseModel
 from typing import List
 
-# Start of Request Schemas
+# request schemas
 class FlightSearchRequest(BaseModel):
     origin: str
     destination: str
@@ -16,7 +13,7 @@ class GroupFlightSearchRequest(BaseModel):
     departure_date: str
     arrival_window: dict  # {"from": "13:00", "to": "15:00"}
 
-# Start of Response schemas
+# response schemas
 class FlightSegmentRead(BaseModel):
     origin: str
     destination: str
