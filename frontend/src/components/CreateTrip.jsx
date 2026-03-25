@@ -1,40 +1,168 @@
 import { useState } from "react";
 import { createTrip } from "../api/trips";
+import ArrivalWindowPicker from "./ArrivalWindowPicker";
 
-export default function CreateTrip({ onTripCreated }) {
+const fmtWindow = (iso) =>
+  iso ? new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }) : null;
+
+export default function CreateTrip({ onTripCreated, onClose }) {
   const [form, setForm] = useState({
     name: "",
     destination_name: "",
     start_date: "",
     end_date: "",
-    arrival_window_start: "",
-    arrival_window_end: ""
+    arrival_window_start: null,
+    arrival_window_end: null,
   });
+  const [showWindowPicker, setShowWindowPicker] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setForm((prev) => {
+      const next = { ...prev, [name]: value };
+      if (name === "start_date" && next.end_date && value > next.end_date) {
+        next.end_date = "";
+      }
+      return next;
+    });
   };
 
-  const handleSubmit = async () => {
-    await createTrip(form);
-    alert("Trip created!");
-    onTripCreated();
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+
+    if (!form.name || !form.destination_name || !form.start_date || !form.end_date) {
+      setError("Please fill in all required fields.");
+      return;
+    }
+
+    if (form.start_date > form.end_date) {
+      setError("End date must be on or after start date.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await createTrip(form);
+      onTripCreated();
+      onClose();
+    } catch {
+      setError("Failed to create trip. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
-  
+
+  const windowSet = form.arrival_window_start && form.arrival_window_end;
+
   return (
-    <div style={{ marginBottom: "40px" }}>
-        <h2>Create Trip</h2>
+    <>
+      <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+        <div className="modal">
+          <div className="modal-header">
+            <h2>Create a New Trip</h2>
+            <button className="modal-close" onClick={onClose}>×</button>
+          </div>
+          <form className="modal-form" onSubmit={handleSubmit}>
+            <div className="form-group">
+              <label>Trip Name *</label>
+              <input
+                name="name"
+                placeholder="e.g. Summer in Cancun"
+                value={form.name}
+                onChange={handleChange}
+              />
+            </div>
+            <div className="form-group">
+              <label>Destination *</label>
+              <input
+                name="destination_name"
+                placeholder="e.g. Cancun, Mexico"
+                value={form.destination_name}
+                onChange={handleChange}
+              />
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Start Date *</label>
+                <input
+                  type="date"
+                  name="start_date"
+                  value={form.start_date}
+                  onChange={handleChange}
+                />
+              </div>
+              <div className="form-group">
+                <label>End Date *</label>
+                <input
+                  type="date"
+                  name="end_date"
+                  value={form.end_date}
+                  min={form.start_date || undefined}
+                  onChange={handleChange}
+                />
+              </div>
+            </div>
 
-        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-        <input name="name" placeholder="Trip Name" onChange={handleChange} />
-        <input name="destination_name" placeholder="Destination" onChange={handleChange} />
-        <input type="date" name="start_date" onChange={handleChange} />
-        <input type="date" name="end_date" onChange={handleChange} />
-        <input type="datetime-local" name="arrival_window_start" onChange={handleChange} />
-        <input type="datetime-local" name="arrival_window_end" onChange={handleChange} />
+            <div>
+              <label style={{ fontSize: 14, fontWeight: 500, display: "block", marginBottom: 6 }}>
+                Arrival Window <span style={{ color: "var(--subtext)", fontWeight: 400 }}>(optional)</span>
+              </label>
+              {windowSet ? (
+                <div className="window-summary">
+                  <span>🕐 {fmtWindow(form.arrival_window_start)} – {fmtWindow(form.arrival_window_end)}</span>
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    style={{ fontSize: 13, padding: "5px 12px" }}
+                    onClick={() => setShowWindowPicker(true)}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    style={{ background: "none", border: "none", color: "var(--subtext)", cursor: "pointer", fontSize: 18, lineHeight: 1, padding: 0 }}
+                    onClick={() => setForm((f) => ({ ...f, arrival_window_start: null, arrival_window_end: null }))}
+                  >
+                    ×
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  style={{ fontSize: 14 }}
+                  disabled={!form.start_date || !form.end_date}
+                  onClick={() => setShowWindowPicker(true)}
+                >
+                  + Set Arrival Window
+                </button>
+              )}
+            </div>
 
-        <button onClick={handleSubmit}>Create</button>
+            {error && <p className="error-text">{error}</p>}
+            <div className="modal-actions">
+              <button type="button" className="btn btn-outline" onClick={onClose}>
+                Cancel
+              </button>
+              <button type="submit" className="btn btn-primary" disabled={loading}>
+                {loading ? "Creating…" : "Create Trip"}
+              </button>
+            </div>
+          </form>
         </div>
-    </div>
-);
+      </div>
+
+      {showWindowPicker && (
+        <ArrivalWindowPicker
+          tripStart={form.start_date}
+          tripEnd={form.end_date}
+          onConfirm={(w) => setForm((f) => ({ ...f, ...w }))}
+          onClose={() => setShowWindowPicker(false)}
+        />
+      )}
+    </>
+  );
 }
