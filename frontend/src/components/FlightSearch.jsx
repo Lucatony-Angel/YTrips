@@ -115,46 +115,28 @@ export default function FlightSearch({ tripId, destination, tripStartDate, tripE
       </div>
 
       <div className="flight-window-row">
-        <span style={{ fontSize: 14, fontWeight: 500 }}>Arrival Window</span>
+        <span className="label-inline" style={{ marginBottom: 0 }}>Arrival Window</span>
         {window_ ? (
-          <div className="window-summary" style={{ flex: 1 }}>
+          <div className="window-summary flex-1">
             <span>🕐 {fmtHour(window_.arrival_window_start)} – {fmtHour(window_.arrival_window_end)}</span>
-            <button
-              type="button"
-              className="btn btn-outline"
-              style={{ fontSize: 12, padding: "4px 10px" }}
-              onClick={() => setShowWindowPicker(true)}
-            >
-              Edit
-            </button>
-            <button
-              type="button"
-              style={{ background: "none", border: "none", color: "var(--subtext)", cursor: "pointer", fontSize: 18, lineHeight: 1, padding: 0 }}
-              onClick={() => setWindow(null)}
-            >
-              ×
-            </button>
+            <button type="button" className="btn btn-outline btn-xs" onClick={() => setShowWindowPicker(true)}>Edit</button>
+            <button type="button" className="btn-icon" onClick={() => setWindow(null)}>×</button>
           </div>
         ) : (
-          <button
-            type="button"
-            className="btn btn-outline"
-            style={{ fontSize: 13 }}
-            onClick={() => setShowWindowPicker(true)}
-          >
+          <button type="button" className="btn btn-outline btn-sm" onClick={() => setShowWindowPicker(true)}>
             + Set Window
           </button>
         )}
       </div>
 
-      {error && <p className="error-text" style={{ marginTop: 12 }}>{error}</p>}
-      {added && <p style={{ color: "#16A34A", fontSize: 14, marginTop: 12 }}>✓ Flight {added} added to trip!</p>}
+      {error && <p className="error-text mt-md">{error}</p>}
+      {added && <p className="text-success mt-md">✓ Flight {added} added to trip!</p>}
 
       {results.length > 0 && (
         <div className="flight-results">
           {filteredResults.length === 0 ? (
-            <p style={{ color: "var(--subtext)", fontSize: 14 }}>
-              No flights arrive within your window. <button style={{ background: "none", border: "none", color: "var(--blue)", cursor: "pointer", padding: 0, fontSize: 14 }} onClick={() => setWindow(null)}>Clear window</button> to see all {results.length} results.
+            <p className="text-sub">
+              No flights arrive within your window. <button className="btn-link" onClick={() => setWindow(null)}>Clear window</button> to see all {results.length} results.
             </p>
           ) : (
             <>
@@ -170,7 +152,7 @@ export default function FlightSearch({ tripId, destination, tripStartDate, tripE
                         <div className="flight-route">
                           {segment.origin} → {lastSeg.destination}
                           {segment.flight_number && (
-                            <span style={{ marginLeft: 8, color: "var(--subtext)", fontWeight: 500 }}>
+                            <span className="flight-number-tag">
                               · {segment.marketing_carrier} {segment.flight_number}
                             </span>
                           )}
@@ -186,11 +168,7 @@ export default function FlightSearch({ tripId, destination, tripStartDate, tripE
                       </div>
                       <div className="flight-result-right">
                         <div className="flight-price">{flight.total_currency} {flight.total_amount}</div>
-                        <button
-                          className="btn btn-primary"
-                          style={{ fontSize: 13, padding: "7px 14px" }}
-                          onClick={() => handleAddFlight(flight, segment)}
-                        >
+                        <button className="btn btn-primary btn-sm" onClick={() => handleAddFlight(flight, segment)}>
                           Add to Trip
                         </button>
                       </div>
@@ -199,11 +177,9 @@ export default function FlightSearch({ tripId, destination, tripStartDate, tripE
                 );
               })}
               {hiddenCount > 0 && (
-                <p style={{ color: "var(--subtext)", fontSize: 13, textAlign: "center" }}>
+                <p className="text-sub text-center">
                   {hiddenCount} flight{hiddenCount > 1 ? "s" : ""} outside your window hidden.{" "}
-                  <button style={{ background: "none", border: "none", color: "var(--blue)", cursor: "pointer", padding: 0, fontSize: 13 }} onClick={() => setWindow(null)}>
-                    Show all
-                  </button>
+                  <button className="btn-link" onClick={() => setWindow(null)}>Show all</button>
                 </p>
               )}
             </>

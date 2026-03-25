@@ -107,33 +107,19 @@ export default function CreateTrip({ onTripCreated, onClose }) {
             </div>
 
             <div>
-              <label style={{ fontSize: 14, fontWeight: 500, display: "block", marginBottom: 6 }}>
-                Arrival Window <span style={{ color: "var(--subtext)", fontWeight: 400 }}>(optional)</span>
+              <label className="label-inline">
+                Arrival Window <span className="label-hint">(optional)</span>
               </label>
               {windowSet ? (
                 <div className="window-summary">
                   <span>🕐 {fmtWindow(form.arrival_window_start)} – {fmtWindow(form.arrival_window_end)}</span>
-                  <button
-                    type="button"
-                    className="btn btn-outline"
-                    style={{ fontSize: 13, padding: "5px 12px" }}
-                    onClick={() => setShowWindowPicker(true)}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    style={{ background: "none", border: "none", color: "var(--subtext)", cursor: "pointer", fontSize: 18, lineHeight: 1, padding: 0 }}
-                    onClick={() => setForm((f) => ({ ...f, arrival_window_start: null, arrival_window_end: null }))}
-                  >
-                    ×
-                  </button>
+                  <button type="button" className="btn btn-outline btn-xs" onClick={() => setShowWindowPicker(true)}>Edit</button>
+                  <button type="button" className="btn-icon" onClick={() => setForm((f) => ({ ...f, arrival_window_start: null, arrival_window_end: null }))}>×</button>
                 </div>
               ) : (
                 <button
                   type="button"
-                  className="btn btn-outline"
-                  style={{ fontSize: 14 }}
+                  className="btn btn-outline btn-sm"
                   disabled={!form.start_date || !form.end_date}
                   onClick={() => setShowWindowPicker(true)}
                 >
@@ -144,9 +130,7 @@ export default function CreateTrip({ onTripCreated, onClose }) {
 
             {error && <p className="error-text">{error}</p>}
             <div className="modal-actions">
-              <button type="button" className="btn btn-outline" onClick={onClose}>
-                Cancel
-              </button>
+              <button type="button" className="btn btn-outline" onClick={onClose}>Cancel</button>
               <button type="submit" className="btn btn-primary" disabled={loading}>
                 {loading ? "Creating…" : "Create Trip"}
               </button>
