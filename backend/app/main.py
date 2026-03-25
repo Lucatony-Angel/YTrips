@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from app.routers import health, flights
+from app.routers import health, flights, trips
 from app.db.database import Base, engine
 from fastapi.middleware.cors import CORSMiddleware               
 # from app.models import User, Trip, TripMember, FlightSearch
@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 app = FastAPI(title="My API")
 app.include_router(health.router)
 app.include_router(flights.router, prefix="/api/flights", tags=["flights"])
+app.include_router(trips.router, prefix = "/api/trips", tags = ["trips"])
 
 app.add_middleware(
     CORSMiddleware,                                              

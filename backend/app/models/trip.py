@@ -1,4 +1,5 @@
 from datetime import date, datetime
+import uuid
 
 from sqlalchemy import Date, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
@@ -17,3 +18,5 @@ class Trip(Base):
 
     created_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+    invite_code: Mapped[str] = mapped_column(String(36), unique = True, nullable = False, default = lambda: str(uuid.uuid4()), index = True)
