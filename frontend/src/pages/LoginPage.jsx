@@ -36,22 +36,22 @@ export default function LoginPage() {
           <p>From flights to itineraries, YTrips handles the coordination.</p>
           <div className="features-grid">
             <div className="feature-card">
-              <div className="feature-icon">✈</div>
+              <div className="feature-icon"></div>
               <h3>Coordinated Flights</h3>
               <p>Find flights from different cities that arrive within your group's agreed time window.</p>
             </div>
             <div className="feature-card">
-              <div className="feature-icon">🗳</div>
+              <div className="feature-icon"></div>
               <h3>Arrival Window Voting</h3>
               <p>Democratically choose arrival times that work for everyone in your group.</p>
             </div>
             <div className="feature-card">
-              <div className="feature-icon">📅</div>
+              <div className="feature-icon"></div>
               <h3>Shared Itinerary</h3>
               <p>Build day-by-day plans with real place data, reviews, and photos.</p>
             </div>
             <div className="feature-card">
-              <div className="feature-icon">💸</div>
+              <div className="feature-icon"></div>
               <h3>Even Cost Splits</h3>
               <p>Track and split all trip expenses evenly across your entire group.</p>
             </div>

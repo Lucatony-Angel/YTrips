@@ -95,10 +95,10 @@ export default function TripPage() {
               <div className="trip-detail-title">
                 <h1>{trip.name}</h1>
                 <div className="trip-detail-meta">
-                  <span>📍 {trip.destination_name}</span>
-                  <span>📅 {formatDate(trip.start_date)} → {formatDate(trip.end_date)}</span>
+                  <span>{trip.destination_name}</span>
+                  <span>{formatDate(trip.start_date)} → {formatDate(trip.end_date)}</span>
                   {trip.arrival_window_start && (
-                    <span>🕐 Arrival window: {formatDateTime(trip.arrival_window_start)} → {formatDateTime(trip.arrival_window_end)}</span>
+                    <span>Arrival window: {formatDateTime(trip.arrival_window_start)} → {formatDateTime(trip.arrival_window_end)}</span>
                   )}
                 </div>
               </div>

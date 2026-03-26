@@ -118,7 +118,7 @@ export default function FlightSearch({ tripId, destination, tripStartDate, tripE
         <span className="label-inline" style={{ marginBottom: 0 }}>Arrival Window</span>
         {window_ ? (
           <div className="window-summary flex-1">
-            <span>🕐 {fmtHour(window_.arrival_window_start)} – {fmtHour(window_.arrival_window_end)}</span>
+            <span>{fmtHour(window_.arrival_window_start)} – {fmtHour(window_.arrival_window_end)}</span>
             <button type="button" className="btn btn-outline btn-xs" onClick={() => setShowWindowPicker(true)}>Edit</button>
             <button type="button" className="btn-icon" onClick={() => setWindow(null)}>×</button>
           </div>

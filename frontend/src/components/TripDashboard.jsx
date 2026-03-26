@@ -50,7 +50,6 @@ export default function TripDashboard({ refreshTrigger, onNewTrip }) {
             <span className="trip-badge">Trip</span>
           </div>
           <div className="trip-card-dest">
-            <span>📍</span>
             <span>{trip.destination_name}</span>
           </div>
           <div className="trip-card-dates">

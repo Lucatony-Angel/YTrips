@@ -112,7 +112,7 @@ export default function CreateTrip({ onTripCreated, onClose }) {
               </label>
               {windowSet ? (
                 <div className="window-summary">
-                  <span>🕐 {fmtWindow(form.arrival_window_start)} – {fmtWindow(form.arrival_window_end)}</span>
+                  <span>{fmtWindow(form.arrival_window_start)} – {fmtWindow(form.arrival_window_end)}</span>
                   <button type="button" className="btn btn-outline btn-xs" onClick={() => setShowWindowPicker(true)}>Edit</button>
                   <button type="button" className="btn-icon" onClick={() => setForm((f) => ({ ...f, arrival_window_start: null, arrival_window_end: null }))}>×</button>
                 </div>
