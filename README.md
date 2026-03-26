@@ -24,7 +24,17 @@ npm run dev
 
 The website will be available at http://localhost:5173.
 
-The database with many-to-many relationships is hosted on Supabase. Authentication is implemented with OAuth2 with Google. 
+# Deliverable features implemented
+
+- Group flight search for a trip (extra feature not required for MVP)
+- User registration and login with session management 
+- Create a trip (name, destination, dates, arrival window) 
+- Dashboard showing all trips a user belongs to 
+- Generate a unique invite code per trip 
+- Join a trip via the invite link 
+- Basic database with all core tables and many-to-many relationships
+- Basic flight search for a single departure airport and destination 
+
 
 # Timeline
 
