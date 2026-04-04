@@ -4,6 +4,7 @@ __pycache__/
 *.pyc
 *.db
 *.env
+backend/app.db
 
 # Logs
 logs
