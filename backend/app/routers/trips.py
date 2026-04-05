@@ -133,3 +133,7 @@ def join_trip(
     db.add(new_member)
     db.commit()
     return {"message": "Joined successfully"}
+
+@router.get("/{trip_id}/itinerary")
+def get_trip_itinerary(trip_id: int):
+    return []
