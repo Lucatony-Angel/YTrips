@@ -1,7 +1,7 @@
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 import uuid
 
-from sqlalchemy import Date, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Date, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.database import Base
@@ -19,6 +19,9 @@ class Trip(Base):
     arrival_window_end: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     created_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
-    invite_code: Mapped[str] = mapped_column(String(36), unique = True, nullable = False, default = lambda: str(uuid.uuid4()), index = True)
+    invite_code: Mapped[str] = mapped_column(String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4()), index=True)
+
+    banner_color: Mapped[str] = mapped_column(String(7), nullable=False, default="#2D3BE8", server_default="#2D3BE8")
+    banner_image_url: Mapped[str | None] = mapped_column(Text, nullable=True)

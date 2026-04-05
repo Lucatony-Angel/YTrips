@@ -34,3 +34,13 @@ export async function joinTrip(inviteCode) {
   const res = await api.post(`/api/trips/join/${inviteCode}`);
   return res.data;
 }
+
+export async function deleteTrip(id) {
+  const res = await api.delete(`/api/trips/${id}`);
+  return res.data;
+}
+
+export async function updateTripBanner(id, data) {
+  const res = await api.patch(`/api/trips/${id}/banner`, data);
+  return res.data;
+}

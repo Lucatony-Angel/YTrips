@@ -5,6 +5,7 @@ import LoginPage from "./pages/LoginPage";
 import AuthCallback from "./pages/AuthCallback";
 import OnboardingPage from "./pages/OnboardingPage";
 import Dashboard from "./pages/Dashboard";
+import CreateTripPage from "./pages/CreateTripPage";
 import TripPage from "./pages/TripPage";
 import JoinTripPage from "./pages/JoinTripPage";
 import "./App.css";
@@ -29,6 +30,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/trips/new"
+            element={
+              <ProtectedRoute>
+                <CreateTripPage />
               </ProtectedRoute>
             }
           />

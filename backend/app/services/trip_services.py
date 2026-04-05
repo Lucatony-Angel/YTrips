@@ -13,6 +13,8 @@ def create_trip(db: Session, trip_data: TripCreate, user_id: int):
         end_date=trip_data.end_date,
         arrival_window_start=trip_data.arrival_window_start,
         arrival_window_end=trip_data.arrival_window_end,
+        banner_color=trip_data.banner_color,
+        banner_image_url=trip_data.banner_image_url,
         created_by_user_id=user_id
     )
 

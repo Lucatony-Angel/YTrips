@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from app.db.database import get_db
 from app.auth import get_current_user
@@ -7,7 +8,7 @@ from app.models.user import User
 from app.models.trip import Trip
 from app.models.trip_member import TripMember
 from app.models.flight import Flight
-from app.schemas.trip import TripCreate, TripResponse, TripMemberResponse
+from app.schemas.trip import TripCreate, TripBannerUpdate, TripResponse, TripMemberResponse
 from app.schemas.flight import FlightResponse
 from app.services.trip_services import create_trip, get_user_trips
 
@@ -28,7 +29,19 @@ def get_my_trips(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return get_user_trips(db, current_user.id)
+    trips = get_user_trips(db, current_user.id)
+    counts = dict(
+        db.query(TripMember.trip_id, func.count(TripMember.id))
+        .filter(TripMember.trip_id.in_([t.id for t in trips]))
+        .group_by(TripMember.trip_id)
+        .all()
+    )
+    results = []
+    for trip in trips:
+        r = TripResponse.model_validate(trip)
+        r.member_count = counts.get(trip.id, 0)
+        results.append(r)
+    return results
 
 
 @router.get("/{trip_id}", response_model=TripResponse)
@@ -110,6 +123,46 @@ def delete_trip_flight(
     db.delete(flight)
     db.commit()
     return {"message": "Flight deleted"}
+
+
+@router.patch("/{trip_id}/banner", response_model=TripResponse)
+def update_trip_banner(
+    trip_id: int,
+    body: TripBannerUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    trip = (
+        db.query(Trip)
+        .join(TripMember, Trip.id == TripMember.trip_id)
+        .filter(Trip.id == trip_id, TripMember.user_id == current_user.id)
+        .first()
+    )
+    if not trip:
+        raise HTTPException(status_code=404, detail="Trip not found")
+    if body.banner_color is not None:
+        trip.banner_color = body.banner_color
+    if body.banner_image_url is not None or "banner_image_url" in body.model_fields_set:
+        trip.banner_image_url = body.banner_image_url
+    db.commit()
+    db.refresh(trip)
+    return trip
+
+
+@router.delete("/{trip_id}")
+def delete_trip(
+    trip_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    trip = db.query(Trip).filter(Trip.id == trip_id, Trip.created_by_user_id == current_user.id).first()
+    if not trip:
+        raise HTTPException(status_code=404, detail="Trip not found or you are not the owner")
+    db.query(Flight).filter(Flight.trip_id == trip_id).delete()
+    db.query(TripMember).filter(TripMember.trip_id == trip_id).delete()
+    db.delete(trip)
+    db.commit()
+    return {"message": "Trip deleted"}
 
 
 @router.post("/join/{invite_code}")
