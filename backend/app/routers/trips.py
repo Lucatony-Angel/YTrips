@@ -10,6 +10,8 @@ from app.models.trip_member import TripMember
 from app.models.flight import Flight
 from app.schemas.trip import TripCreate, TripBannerUpdate, TripResponse, TripMemberResponse
 from app.schemas.flight import FlightResponse
+from app.schemas.itinerary import ItineraryItemCreate, ItineraryItemUpdate, ItineraryItemResponse
+from app.models.itinerary_item import ItineraryItem
 from app.services.trip_services import create_trip, get_user_trips
 
 router = APIRouter()
@@ -186,3 +188,76 @@ def join_trip(
     db.add(new_member)
     db.commit()
     return {"message": "Joined successfully"}
+
+
+@router.get("/{trip_id}/itinerary", response_model=list[ItineraryItemResponse])
+def get_trip_itinerary(
+    trip_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    # must be a member
+    member = db.query(TripMember).filter(
+        TripMember.trip_id == trip_id,
+        TripMember.user_id == current_user.id,
+    ).first()
+    if not member:
+        raise HTTPException(status_code=403, detail="Not a member of this trip")
+    return db.query(ItineraryItem).filter(ItineraryItem.trip_id == trip_id).order_by(ItineraryItem.scheduled_at).all()
+
+
+@router.post("/{trip_id}/itinerary", response_model=ItineraryItemResponse)
+def create_itinerary_item(
+    trip_id: int,
+    body: ItineraryItemCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    member = db.query(TripMember).filter(
+        TripMember.trip_id == trip_id,
+        TripMember.user_id == current_user.id,
+    ).first()
+    if not member:
+        raise HTTPException(status_code=403, detail="Not a member of this trip")
+    item = ItineraryItem(trip_id=trip_id, created_by_user_id=current_user.id, **body.model_dump())
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@router.put("/{trip_id}/itinerary/{item_id}", response_model=ItineraryItemResponse)
+def update_itinerary_item(
+    trip_id: int,
+    item_id: int,
+    body: ItineraryItemUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    item = db.query(ItineraryItem).filter(ItineraryItem.id == item_id, ItineraryItem.trip_id == trip_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    if item.created_by_user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not your item")
+    for field, value in body.model_dump().items():
+        setattr(item, field, value)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@router.delete("/{trip_id}/itinerary/{item_id}")
+def delete_itinerary_item(
+    trip_id: int,
+    item_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    item = db.query(ItineraryItem).filter(ItineraryItem.id == item_id, ItineraryItem.trip_id == trip_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    if item.created_by_user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not your item")
+    db.delete(item)
+    db.commit()
+    return {"message": "Deleted"}
