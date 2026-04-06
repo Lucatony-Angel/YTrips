@@ -25,6 +25,26 @@ export async function getTripFlights(id) {
   return res.data;
 }
 
+export async function getTripItinerary(id) {
+  const res = await api.get(`/api/trips/${id}/itinerary`);
+  return res.data;
+}
+
+export async function createTripItineraryItem(tripId, data) {
+  const res = await api.post(`/api/trips/${tripId}/itinerary`, data);
+  return res.data;
+}
+
+export async function updateTripItineraryItem(tripId, itemId, data) {
+  const res = await api.put(`/api/trips/${tripId}/itinerary/${itemId}`, data);
+  return res.data;
+}
+
+export async function deleteTripItineraryItem(tripId, itemId) {
+  const res = await api.delete(`/api/trips/${tripId}/itinerary/${itemId}`);
+  return res.data;
+}
+
 export async function deleteTripFlight(tripId, flightId) {
   const res = await api.delete(`/api/trips/${tripId}/flights/${flightId}`);
   return res.data;

@@ -121,6 +121,110 @@
 .trip-detail-meta { display: flex; flex-wrap: wrap; gap: 16px; font-size: 14px; color: var(--subtext); }
 .trip-detail-body .card h3 { font-size: 16px; font-weight: 600; }
 
+/* Itinerary */
+.itinerary-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.itinerary-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-subtle);
+  margin-bottom: 20px;
+}
+
+.itinerary-form textarea {
+  resize: vertical;
+  min-height: 110px;
+}
+
+.itinerary-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.itinerary-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.itinerary-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px 20px;
+  background: #fff;
+}
+
+.itinerary-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+}
+
+.itinerary-card-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.itinerary-card-title-row h4 {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.itinerary-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 10px;
+  color: var(--subtext);
+  font-size: 13px;
+}
+
+.itinerary-description {
+  margin-top: 12px;
+  color: var(--text);
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.itinerary-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.itinerary-empty {
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  text-align: center;
+  background: var(--bg-subtle);
+}
+
+.itinerary-empty h4 {
+  font-size: 16px;
+  margin-bottom: 8px;
+}
+
+.itinerary-empty p {
+  color: var(--subtext);
+  font-size: 14px;
+}
+
 /* Flight search */
 .flight-search { display: flex; flex-direction: column; }
 .flight-search-form { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
@@ -592,3 +696,48 @@
 .onboarding-card h1 { font-size: 26px; font-weight: 700; margin-bottom: 10px; }
 .onboarding-card > p { color: var(--subtext); font-size: 15px; margin-bottom: 32px; line-height: 1.5; }
 .onboarding-form { display: flex; flex-direction: column; gap: 16px; text-align: left; }
+
+@media (max-width: 768px) {
+  .page-header,
+  .page-body,
+  .dashboard-header,
+  .dashboard-body,
+  .landing-hero,
+  .landing-features,
+  .landing-how,
+  .landing-cta,
+  .landing-footer,
+  .section,
+  .container,
+  .navbar {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  .page-body,
+  .dashboard-body {
+    padding-top: 24px;
+    padding-bottom: 24px;
+  }
+
+  .landing-hero,
+  .flight-result-top,
+  .itinerary-card-top,
+  .dashboard-top,
+  .itinerary-header,
+  .itinerary-form-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .landing-hero,
+  .features-grid,
+  .steps-grid,
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .itinerary-actions {
+    justify-content: flex-end;
+  }
+}

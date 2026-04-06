@@ -1,7 +1,17 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { getTrip, getTripFlights, getTripMembers, deleteTripFlight, updateTripBanner } from "../api/trips";
+import {
+  createTripItineraryItem,
+  deleteTripFlight,
+  deleteTripItineraryItem,
+  getTrip,
+  getTripFlights,
+  getTripItinerary,
+  getTripMembers,
+  updateTripBanner,
+  updateTripItineraryItem,
+} from "../api/trips";
 import Navbar from "../components/Navbar";
 import FlightSearch from "../components/FlightSearch";
 import "../App.css";
@@ -10,6 +20,38 @@ const PRESET_COLORS = [
   "#2D3BE8", "#7C3AED", "#DB2777", "#DC2626",
   "#D97706", "#16A34A", "#0891B2", "#374151",
 ];
+
+const emptyItineraryForm = {
+  title: "",
+  description: "",
+  scheduled_at: "",
+  location: "",
+  category: "",
+};
+
+function getErrorMessage(error, fallbackMessage) {
+  const detail = error?.response?.data?.detail;
+  return typeof detail === "string" ? detail : fallbackMessage;
+}
+
+function toDateTimeLocalValue(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const timezoneOffsetMs = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - timezoneOffsetMs).toISOString().slice(0, 16);
+}
+
+function getTripDateTimeBoundary(date, isEndOfDay = false) {
+  if (!date) return undefined;
+  return `${date}T${isEndOfDay ? "23:59" : "00:00"}`;
+}
+
+function isScheduledWithinTripDates(scheduledAt, trip) {
+  if (!scheduledAt || !trip?.start_date || !trip?.end_date) return true;
+  const scheduledDate = scheduledAt.slice(0, 10);
+  return scheduledDate >= trip.start_date && scheduledDate <= trip.end_date;
+}
 
 export default function TripPage() {
   const { id } = useParams();
@@ -20,6 +62,7 @@ export default function TripPage() {
   const [trip, setTrip] = useState(null);
   const [flights, setFlights] = useState([]);
   const [members, setMembers] = useState([]);
+  const [itineraryItems, setItineraryItems] = useState([]);
   const [activeTab, setActiveTab] = useState("my");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -28,19 +71,56 @@ export default function TripPage() {
   const [confirmDeleteFlight, setConfirmDeleteFlight] = useState(null);
   const [copiedCode, setCopiedCode] = useState(false);
 
+  // Itinerary form state
+  const [itineraryForm, setItineraryForm] = useState(emptyItineraryForm);
+  const [editingItineraryId, setEditingItineraryId] = useState(null);
+  const [itinerarySubmitting, setItinerarySubmitting] = useState(false);
+  const [itineraryError, setItineraryError] = useState("");
+  const [itinerarySuccess, setItinerarySuccess] = useState("");
+
   useEffect(() => {
-    Promise.all([getTrip(id), getTripFlights(id), getTripMembers(id)])
-      .then(([tripData, flightData, memberData]) => {
+    let isActive = true;
+    setLoading(true);
+    setError("");
+
+    Promise.all([getTrip(id), getTripFlights(id), getTripMembers(id), getTripItinerary(id)])
+      .then(([tripData, flightData, memberData, itineraryData]) => {
+        if (!isActive) return;
         setTrip(tripData);
         setFlights(flightData);
         setMembers(memberData);
+        setItineraryItems(itineraryData);
       })
-      .catch(() => setError("Trip not found."))
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        if (!isActive) return;
+        setError(getErrorMessage(err, "Trip not found."));
+      })
+      .finally(() => {
+        if (isActive) setLoading(false);
+      });
+
+    return () => { isActive = false; };
   }, [id]);
 
-  const refreshFlights = () => {
-    getTripFlights(id).then(setFlights).catch(() => {});
+  const refreshFlights = async () => {
+    try {
+      const data = await getTripFlights(id);
+      setFlights(data);
+    } catch (err) {
+      setError(getErrorMessage(err, "Unable to refresh flights."));
+    }
+  };
+
+  const refreshItinerary = async () => {
+    const data = await getTripItinerary(id);
+    setItineraryItems(data);
+  };
+
+  const resetItineraryForm = () => {
+    setEditingItineraryId(null);
+    setItineraryForm(emptyItineraryForm);
+    setItineraryError("");
+    setItinerarySuccess("");
   };
 
   const handleColorChange = async (color) => {
@@ -83,13 +163,17 @@ export default function TripPage() {
     d ? new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—";
 
   const formatDateTime = (dt) =>
-    dt ? new Date(dt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—";
+    dt ? new Date(dt).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }) : "—";
 
   const flightByUser = {};
   for (const f of flights) {
     if (!flightByUser[f.user_id]) flightByUser[f.user_id] = [];
     flightByUser[f.user_id].push(f);
   }
+
+  const memberNameById = Object.fromEntries(
+    members.map((m) => [m.user_id, m.user_id === user?.id ? "You" : m.display_name])
+  );
 
   const sortedMembers = [...members].sort((a, b) => {
     if (a.user_id === user?.id) return -1;
@@ -101,8 +185,80 @@ export default function TripPage() {
     try {
       await deleteTripFlight(id, flightId);
       setConfirmDeleteFlight(null);
-      refreshFlights();
-    } catch {}
+      await refreshFlights();
+    } catch (err) {
+      setError(getErrorMessage(err, "Unable to delete flight."));
+    }
+  };
+
+  const handleItineraryFieldChange = (event) => {
+    const { name, value } = event.target;
+    setItineraryForm((current) => ({ ...current, [name]: value }));
+  };
+
+  const handleEditItineraryItem = (item) => {
+    setEditingItineraryId(item.id);
+    setItineraryForm({
+      title: item.title,
+      description: item.description,
+      scheduled_at: toDateTimeLocalValue(item.scheduled_at),
+      location: item.location,
+      category: item.category,
+    });
+    setItineraryError("");
+    setItinerarySuccess("");
+  };
+
+  const handleSubmitItinerary = async (event) => {
+    event.preventDefault();
+    setItineraryError("");
+    setItinerarySuccess("");
+
+    const payload = {
+      title: itineraryForm.title.trim(),
+      description: itineraryForm.description.trim(),
+      scheduled_at: itineraryForm.scheduled_at,
+      location: itineraryForm.location.trim(),
+      category: itineraryForm.category.trim(),
+    };
+
+    if (!isScheduledWithinTripDates(payload.scheduled_at, trip)) {
+      setItineraryError("Date & time must fall within the trip dates.");
+      return;
+    }
+
+    setItinerarySubmitting(true);
+    try {
+      if (editingItineraryId) {
+        await updateTripItineraryItem(id, editingItineraryId, payload);
+        setItinerarySuccess("Itinerary item updated.");
+      } else {
+        await createTripItineraryItem(id, payload);
+        setItinerarySuccess("Itinerary item added.");
+      }
+      await refreshItinerary();
+      resetItineraryForm();
+    } catch (err) {
+      setItineraryError(
+        getErrorMessage(err, editingItineraryId ? "Unable to update itinerary item." : "Unable to add itinerary item.")
+      );
+    } finally {
+      setItinerarySubmitting(false);
+    }
+  };
+
+  const handleDeleteItineraryItem = async (itemId) => {
+    if (!window.confirm("Delete this itinerary item?")) return;
+    setItineraryError("");
+    setItinerarySuccess("");
+    try {
+      await deleteTripItineraryItem(id, itemId);
+      await refreshItinerary();
+      if (editingItineraryId === itemId) resetItineraryForm();
+      setItinerarySuccess("Itinerary item removed.");
+    } catch (err) {
+      setItineraryError(getErrorMessage(err, "Unable to remove itinerary item."));
+    }
   };
 
   const FlightCard = ({ flight, canDelete }) => (
@@ -181,7 +337,6 @@ export default function TripPage() {
                   </span>
                 </div>
 
-                {/* Inline banner editor */}
                 {showBannerEdit && (
                   <div className="banner-edit-panel">
                     <div className="banner-edit-section">
@@ -268,7 +423,7 @@ export default function TripPage() {
               </div>
             </div>
 
-            {/* Flights with tabs */}
+            {/* Main tabbed card */}
             <div className="card">
               <div className="flight-tabs">
                 <button
@@ -286,6 +441,14 @@ export default function TripPage() {
                   Group Flights
                 </button>
                 <button
+                  className={`flight-tab${activeTab === "itinerary" ? " active" : ""}`}
+                  onClick={() => setActiveTab("itinerary")}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                  Itinerary
+                  <span className="tab-count">{itineraryItems.length}</span>
+                </button>
+                <button
                   className={`flight-tab${activeTab === "members" ? " active" : ""}`}
                   onClick={() => setActiveTab("members")}
                 >
@@ -295,6 +458,7 @@ export default function TripPage() {
                 </button>
               </div>
 
+              {/* My Flight */}
               {activeTab === "my" && (
                 <div className="mt-md">
                   <div className="member-flight-label" style={{ marginBottom: 8 }}>
@@ -311,6 +475,7 @@ export default function TripPage() {
                 </div>
               )}
 
+              {/* Group Flights */}
               {activeTab === "group" && (
                 <div className="gap-col mt-md">
                   {sortedMembers.map((member) => {
@@ -337,6 +502,133 @@ export default function TripPage() {
                 </div>
               )}
 
+              {/* Itinerary */}
+              {activeTab === "itinerary" && (
+                <div className="mt-md">
+                  <form className="itinerary-form" onSubmit={handleSubmitItinerary}>
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label htmlFor="itinerary-title">Title</label>
+                        <input
+                          id="itinerary-title"
+                          name="title"
+                          value={itineraryForm.title}
+                          onChange={handleItineraryFieldChange}
+                          placeholder="Sunset dinner"
+                          required
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label htmlFor="itinerary-category">Category</label>
+                        <input
+                          id="itinerary-category"
+                          name="category"
+                          value={itineraryForm.category}
+                          onChange={handleItineraryFieldChange}
+                          placeholder="Food, activity, transit…"
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label htmlFor="itinerary-datetime">Date &amp; Time</label>
+                        <input
+                          id="itinerary-datetime"
+                          type="datetime-local"
+                          name="scheduled_at"
+                          value={itineraryForm.scheduled_at}
+                          onChange={handleItineraryFieldChange}
+                          min={getTripDateTimeBoundary(trip?.start_date)}
+                          max={getTripDateTimeBoundary(trip?.end_date, true)}
+                          required
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label htmlFor="itinerary-location">Location</label>
+                        <input
+                          id="itinerary-location"
+                          name="location"
+                          value={itineraryForm.location}
+                          onChange={handleItineraryFieldChange}
+                          placeholder="123 Ocean Ave"
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor="itinerary-description">Description</label>
+                      <textarea
+                        id="itinerary-description"
+                        name="description"
+                        value={itineraryForm.description}
+                        onChange={handleItineraryFieldChange}
+                        placeholder="Add notes, meeting details, reservation info, or links."
+                        rows={3}
+                        required
+                      />
+                    </div>
+                    {itineraryError && <p className="error-text">{itineraryError}</p>}
+                    {itinerarySuccess && <p className="text-success">{itinerarySuccess}</p>}
+                    <div className="itinerary-form-actions">
+                      {editingItineraryId && (
+                        <button type="button" className="btn btn-outline" onClick={resetItineraryForm} disabled={itinerarySubmitting}>
+                          Cancel
+                        </button>
+                      )}
+                      <button type="submit" className="btn btn-primary" disabled={itinerarySubmitting}>
+                        {itinerarySubmitting
+                          ? editingItineraryId ? "Saving…" : "Adding…"
+                          : editingItineraryId ? "Save Changes" : "Add Item"}
+                      </button>
+                    </div>
+                  </form>
+
+                  {itineraryItems.length > 0 ? (
+                    <div className="itinerary-list">
+                      {itineraryItems.map((item) => (
+                        <div className="itinerary-card" key={item.id}>
+                          <div className="itinerary-card-top">
+                            <div style={{ flex: 1 }}>
+                              <div className="itinerary-card-title-row">
+                                <h4>{item.title}</h4>
+                                <span className="trip-badge">{item.category}</span>
+                              </div>
+                              <div className="itinerary-meta">
+                                <span>
+                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                                  {formatDateTime(item.scheduled_at)}
+                                </span>
+                                <span>
+                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+                                  {item.location}
+                                </span>
+                                <span>Added by {memberNameById[item.created_by_user_id] || "A trip member"}</span>
+                              </div>
+                              {item.description && <p className="itinerary-description">{item.description}</p>}
+                            </div>
+                            <div className="itinerary-actions">
+                              <button type="button" className="btn btn-outline btn-sm" onClick={() => handleEditItineraryItem(item)}>
+                                Edit
+                              </button>
+                              <button type="button" className="btn btn-delete" onClick={() => handleDeleteItineraryItem(item.id)}>
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="itinerary-empty">
+                      <h4>No itinerary items yet</h4>
+                      <p>Start building the plan with activities, reservations, transfers, or meetups.</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Members */}
               {activeTab === "members" && (
                 <div className="members-list mt-md">
                   {sortedMembers.map((member) => {
@@ -366,11 +658,11 @@ export default function TripPage() {
               )}
             </div>
 
-            {/* Search */}
+            {/* Search & Add Flights */}
             <div className="card">
               <h3 className="mb-lg">Search &amp; Add Flights</h3>
               <FlightSearch
-                tripId={parseInt(id)}
+                tripId={parseInt(id, 10)}
                 destination={trip.destination_name}
                 tripStartDate={trip.start_date}
                 tripEndDate={trip.end_date}
