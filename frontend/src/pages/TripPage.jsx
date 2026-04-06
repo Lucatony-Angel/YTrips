@@ -2,7 +2,6 @@ import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import {
-<<<<<<< HEAD
   createTripItineraryItem,
   deleteTripFlight,
   deleteTripItineraryItem,
@@ -12,10 +11,6 @@ import {
   getTripMembers,
   updateTripBanner,
   updateTripItineraryItem,
-=======
-  getTrip, getTripFlights, getTripMembers, deleteTripFlight, updateTripBanner,
-  getTripItinerary, createTripItineraryItem, updateTripItineraryItem, deleteTripItineraryItem,
->>>>>>> refs/rewritten/Merge-feature-rishi2-into-main
 } from "../api/trips";
 import Navbar from "../components/Navbar";
 import FlightSearch from "../components/FlightSearch";
@@ -27,7 +22,6 @@ const PRESET_COLORS = [
 ];
 
 const emptyItineraryForm = {
-<<<<<<< HEAD
   title: "",
   description: "",
   scheduled_at: "",
@@ -38,26 +32,14 @@ const emptyItineraryForm = {
 function getErrorMessage(error, fallbackMessage) {
   const detail = error?.response?.data?.detail;
   return typeof detail === "string" ? detail : fallbackMessage;
-=======
-  title: "", description: "", scheduled_at: "", location: "", category: "",
-};
-
-function getErrorMessage(error, fallback) {
-  const detail = error?.response?.data?.detail;
-  return typeof detail === "string" ? detail : fallback;
->>>>>>> refs/rewritten/Merge-feature-rishi2-into-main
 }
 
 function toDateTimeLocalValue(value) {
   if (!value) return "";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
-<<<<<<< HEAD
   const timezoneOffsetMs = date.getTimezoneOffset() * 60_000;
   return new Date(date.getTime() - timezoneOffsetMs).toISOString().slice(0, 16);
-=======
-  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
->>>>>>> refs/rewritten/Merge-feature-rishi2-into-main
 }
 
 function getTripDateTimeBoundary(date, isEndOfDay = false) {
@@ -67,13 +49,8 @@ function getTripDateTimeBoundary(date, isEndOfDay = false) {
 
 function isScheduledWithinTripDates(scheduledAt, trip) {
   if (!scheduledAt || !trip?.start_date || !trip?.end_date) return true;
-<<<<<<< HEAD
   const scheduledDate = scheduledAt.slice(0, 10);
   return scheduledDate >= trip.start_date && scheduledDate <= trip.end_date;
-=======
-  const d = scheduledAt.slice(0, 10);
-  return d >= trip.start_date && d <= trip.end_date;
->>>>>>> refs/rewritten/Merge-feature-rishi2-into-main
 }
 
 export default function TripPage() {
@@ -94,21 +71,13 @@ export default function TripPage() {
   const [confirmDeleteFlight, setConfirmDeleteFlight] = useState(null);
   const [copiedCode, setCopiedCode] = useState(false);
 
-<<<<<<< HEAD
   // Itinerary add form state
-=======
-  // Itinerary add form
->>>>>>> refs/rewritten/Merge-feature-rishi2-into-main
   const [itineraryForm, setItineraryForm] = useState(emptyItineraryForm);
   const [itinerarySubmitting, setItinerarySubmitting] = useState(false);
   const [itineraryError, setItineraryError] = useState("");
   const [itinerarySuccess, setItinerarySuccess] = useState("");
 
-<<<<<<< HEAD
   // Itinerary edit modal state
-=======
-  // Itinerary edit modal
->>>>>>> refs/rewritten/Merge-feature-rishi2-into-main
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editModalItem, setEditModalItem] = useState(null);
   const [editModalForm, setEditModalForm] = useState(emptyItineraryForm);
@@ -121,11 +90,8 @@ export default function TripPage() {
   useEffect(() => {
     let isActive = true;
     setLoading(true);
-<<<<<<< HEAD
     setError("");
 
-=======
->>>>>>> refs/rewritten/Merge-feature-rishi2-into-main
     Promise.all([getTrip(id), getTripFlights(id), getTripMembers(id), getTripItinerary(id)])
       .then(([tripData, flightData, memberData, itineraryData]) => {
         if (!isActive) return;
@@ -134,7 +100,6 @@ export default function TripPage() {
         setMembers(memberData);
         setItineraryItems(itineraryData);
       })
-<<<<<<< HEAD
       .catch((err) => {
         if (!isActive) return;
         setError(getErrorMessage(err, "Trip not found."));
@@ -143,10 +108,6 @@ export default function TripPage() {
         if (isActive) setLoading(false);
       });
 
-=======
-      .catch(() => { if (isActive) setError("Trip not found."); })
-      .finally(() => { if (isActive) setLoading(false); });
->>>>>>> refs/rewritten/Merge-feature-rishi2-into-main
     return () => { isActive = false; };
   }, [id]);
 
@@ -301,11 +262,7 @@ export default function TripPage() {
     setItineraryError("");
     setItinerarySuccess("");
     const rawAt = itineraryForm.scheduled_at;
-<<<<<<< HEAD
     const scheduled_at = rawAt && !rawAt.includes(":") ? rawAt : rawAt.length === 16 ? rawAt + ":00" : rawAt;
-=======
-    const scheduled_at = rawAt.length === 16 ? rawAt + ":00" : rawAt;
->>>>>>> refs/rewritten/Merge-feature-rishi2-into-main
     const payload = {
       title: itineraryForm.title.trim(),
       description: itineraryForm.description.trim(),
@@ -513,26 +470,18 @@ export default function TripPage() {
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                   Group Flights
                 </button>
-<<<<<<< HEAD
                 <button
                   className={`flight-tab${activeTab === "itinerary" ? " active" : ""}`}
                   onClick={() => setActiveTab("itinerary")}
                 >
-=======
-                <button className={`flight-tab${activeTab === "itinerary" ? " active" : ""}`} onClick={() => setActiveTab("itinerary")}>
->>>>>>> refs/rewritten/Merge-feature-rishi2-into-main
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
                   Itinerary
                   <span className="tab-count">{itineraryItems.length}</span>
                 </button>
-<<<<<<< HEAD
                 <button
                   className={`flight-tab${activeTab === "members" ? " active" : ""}`}
                   onClick={() => setActiveTab("members")}
                 >
-=======
-                <button className={`flight-tab${activeTab === "members" ? " active" : ""}`} onClick={() => setActiveTab("members")}>
->>>>>>> refs/rewritten/Merge-feature-rishi2-into-main
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                   Members
                   <span className="tab-count">{members.length}</span>
@@ -588,7 +537,6 @@ export default function TripPage() {
                     <div className="form-row">
                       <div className="form-group">
                         <label htmlFor="itinerary-title">Title</label>
-<<<<<<< HEAD
                         <input
                           id="itinerary-title"
                           name="title"
@@ -608,19 +556,11 @@ export default function TripPage() {
                           placeholder="Food, activity, transit…"
                           required
                         />
-=======
-                        <input id="itinerary-title" name="title" value={itineraryForm.title} onChange={handleItineraryFieldChange} placeholder="Sunset dinner" required />
-                      </div>
-                      <div className="form-group">
-                        <label htmlFor="itinerary-category">Category</label>
-                        <input id="itinerary-category" name="category" value={itineraryForm.category} onChange={handleItineraryFieldChange} placeholder="Food, activity, transit…" required />
->>>>>>> refs/rewritten/Merge-feature-rishi2-into-main
                       </div>
                     </div>
                     <div className="form-row">
                       <div className="form-group">
                         <label htmlFor="itinerary-datetime">Date &amp; Time</label>
-<<<<<<< HEAD
                         <input
                           id="itinerary-datetime"
                           type="datetime-local"
@@ -642,18 +582,10 @@ export default function TripPage() {
                           placeholder="123 Ocean Ave"
                           required
                         />
-=======
-                        <input id="itinerary-datetime" type="datetime-local" name="scheduled_at" value={itineraryForm.scheduled_at} onChange={handleItineraryFieldChange} min={getTripDateTimeBoundary(trip?.start_date)} max={getTripDateTimeBoundary(trip?.end_date, true)} required />
-                      </div>
-                      <div className="form-group">
-                        <label htmlFor="itinerary-location">Location</label>
-                        <input id="itinerary-location" name="location" value={itineraryForm.location} onChange={handleItineraryFieldChange} placeholder="123 Ocean Ave" required />
->>>>>>> refs/rewritten/Merge-feature-rishi2-into-main
                       </div>
                     </div>
                     <div className="form-group">
                       <label htmlFor="itinerary-description">Description</label>
-<<<<<<< HEAD
                       <textarea
                         id="itinerary-description"
                         name="description"
@@ -663,9 +595,6 @@ export default function TripPage() {
                         rows={3}
                         required
                       />
-=======
-                      <textarea id="itinerary-description" name="description" value={itineraryForm.description} onChange={handleItineraryFieldChange} placeholder="Add notes, meeting details, reservation info, or links." rows={3} required />
->>>>>>> refs/rewritten/Merge-feature-rishi2-into-main
                     </div>
                     {itineraryError && <p className="error-text">{itineraryError}</p>}
                     {itinerarySuccess && <p className="text-success">{itinerarySuccess}</p>}
@@ -708,17 +637,12 @@ export default function TripPage() {
                                 </div>
                               ) : (
                                 <>
-<<<<<<< HEAD
                                   <button type="button" className="btn btn-outline btn-sm" onClick={() => openEditModal(item)}>
                                     Edit
                                   </button>
                                   <button type="button" className="btn btn-delete" onClick={() => setConfirmDeleteItinerary(item.id)}>
                                     Delete
                                   </button>
-=======
-                                  <button type="button" className="btn btn-outline btn-sm" onClick={() => openEditModal(item)}>Edit</button>
-                                  <button type="button" className="btn btn-delete" onClick={() => setConfirmDeleteItinerary(item.id)}>Delete</button>
->>>>>>> refs/rewritten/Merge-feature-rishi2-into-main
                                 </>
                               )}
                             </div>
@@ -808,7 +732,6 @@ export default function TripPage() {
               <div className="form-row">
                 <div className="form-group">
                   <label>Date &amp; Time</label>
-<<<<<<< HEAD
                   <input
                     type="datetime-local"
                     name="scheduled_at"
@@ -818,9 +741,6 @@ export default function TripPage() {
                     max={getTripDateTimeBoundary(trip?.end_date, true)}
                     required
                   />
-=======
-                  <input type="datetime-local" name="scheduled_at" value={editModalForm.scheduled_at} onChange={handleEditModalFieldChange} min={getTripDateTimeBoundary(trip?.start_date)} max={getTripDateTimeBoundary(trip?.end_date, true)} required />
->>>>>>> refs/rewritten/Merge-feature-rishi2-into-main
                 </div>
                 <div className="form-group">
                   <label>Location</label>

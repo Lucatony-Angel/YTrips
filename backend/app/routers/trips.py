@@ -99,7 +99,6 @@ def get_trip_flights(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # check membership
     member = db.query(TripMember).filter(
         TripMember.trip_id == trip_id,
         TripMember.user_id == current_user.id,
@@ -117,7 +116,10 @@ def delete_trip_flight(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    flight = db.query(Flight).filter(Flight.id == flight_id, Flight.trip_id == trip_id).first()
+    flight = db.query(Flight).filter(
+        Flight.id == flight_id,
+        Flight.trip_id == trip_id
+    ).first()
     if not flight:
         raise HTTPException(status_code=404, detail="Flight not found")
     if flight.user_id != current_user.id:
@@ -142,10 +144,12 @@ def update_trip_banner(
     )
     if not trip:
         raise HTTPException(status_code=404, detail="Trip not found")
+
     if body.banner_color is not None:
         trip.banner_color = body.banner_color
     if body.banner_image_url is not None or "banner_image_url" in body.model_fields_set:
         trip.banner_image_url = body.banner_image_url
+
     db.commit()
     db.refresh(trip)
     return trip
@@ -157,13 +161,18 @@ def delete_trip(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    trip = db.query(Trip).filter(Trip.id == trip_id, Trip.created_by_user_id == current_user.id).first()
+    trip = db.query(Trip).filter(
+        Trip.id == trip_id,
+        Trip.created_by_user_id == current_user.id
+    ).first()
     if not trip:
         raise HTTPException(status_code=404, detail="Trip not found or you are not the owner")
+
     db.query(Flight).filter(Flight.trip_id == trip_id).delete()
     db.query(TripMember).filter(TripMember.trip_id == trip_id).delete()
     db.delete(trip)
     db.commit()
+
     return {"message": "Trip deleted"}
 
 
@@ -187,26 +196,29 @@ def join_trip(
     new_member = TripMember(trip_id=trip.id, user_id=current_user.id)
     db.add(new_member)
     db.commit()
+
     return {"message": "Joined successfully"}
 
-<<<<<<< HEAD
-=======
 
->>>>>>> refs/rewritten/Merge-feature-rishi2-into-main
+# -------- ITINERARY ROUTES --------
+
 @router.get("/{trip_id}/itinerary", response_model=list[ItineraryItemResponse])
 def get_trip_itinerary(
     trip_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # must be a member
     member = db.query(TripMember).filter(
         TripMember.trip_id == trip_id,
         TripMember.user_id == current_user.id,
     ).first()
     if not member:
         raise HTTPException(status_code=403, detail="Not a member of this trip")
-    return db.query(ItineraryItem).filter(ItineraryItem.trip_id == trip_id).order_by(ItineraryItem.scheduled_at).all()
+
+    return db.query(ItineraryItem)\
+        .filter(ItineraryItem.trip_id == trip_id)\
+        .order_by(ItineraryItem.scheduled_at)\
+        .all()
 
 
 @router.post("/{trip_id}/itinerary", response_model=ItineraryItemResponse)
@@ -222,10 +234,16 @@ def create_itinerary_item(
     ).first()
     if not member:
         raise HTTPException(status_code=403, detail="Not a member of this trip")
-    item = ItineraryItem(trip_id=trip_id, created_by_user_id=current_user.id, **body.model_dump())
+
+    item = ItineraryItem(
+        trip_id=trip_id,
+        created_by_user_id=current_user.id,
+        **body.model_dump()
+    )
     db.add(item)
     db.commit()
     db.refresh(item)
+
     return item
 
 
@@ -237,15 +255,22 @@ def update_itinerary_item(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    item = db.query(ItineraryItem).filter(ItineraryItem.id == item_id, ItineraryItem.trip_id == trip_id).first()
+    item = db.query(ItineraryItem).filter(
+        ItineraryItem.id == item_id,
+        ItineraryItem.trip_id == trip_id
+    ).first()
+
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
     if item.created_by_user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not your item")
+
     for field, value in body.model_dump().items():
         setattr(item, field, value)
+
     db.commit()
     db.refresh(item)
+
     return item
 
 
@@ -256,15 +281,17 @@ def delete_itinerary_item(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    item = db.query(ItineraryItem).filter(ItineraryItem.id == item_id, ItineraryItem.trip_id == trip_id).first()
+    item = db.query(ItineraryItem).filter(
+        ItineraryItem.id == item_id,
+        ItineraryItem.trip_id == trip_id
+    ).first()
+
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
     if item.created_by_user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not your item")
+
     db.delete(item)
     db.commit()
-<<<<<<< HEAD
+
     return {"message": "Deleted"}
-=======
-    return {"message": "Deleted"}
->>>>>>> refs/rewritten/Merge-feature-rishi2-into-main
