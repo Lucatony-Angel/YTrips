@@ -37,7 +37,9 @@ async def login():
 
 
 @router.get("/google/callback")
-async def callback(code: str = Query(...), db: Session = Depends(get_db)):
+async def callback(code: str = Query(None), db: Session = Depends(get_db)):
+    if not code:
+        return RedirectResponse("/api/auth/google")
     # google sends user back here with a code, we swap it for tokens
     async with httpx.AsyncClient() as client:
         token_resp = await client.post(GOOGLE_TOKEN_URL, data={

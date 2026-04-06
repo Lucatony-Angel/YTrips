@@ -71,7 +71,7 @@ export default function JoinTripPage() {
               type="button"
               className="btn btn-outline"
               style={{ width: "100%", padding: "12px" }}
-              onClick={() => navigate("/")}
+              onClick={() => navigate(-1)}
             >
               Cancel
             </button>

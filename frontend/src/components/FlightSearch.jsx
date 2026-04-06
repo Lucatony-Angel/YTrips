@@ -1,18 +1,30 @@
 import { useState } from "react";
 import { searchFlights, addFlight } from "../api/flights";
+import { useAuth } from "../context/AuthContext";
 import ArrivalWindowPicker from "./ArrivalWindowPicker";
 
 const isoHour = (iso) => (iso ? parseInt(iso.slice(11, 13), 10) : null);
 const fmtHour = (iso) => iso ? `${iso.slice(11, 16)}` : null;
 
-export default function FlightSearch({ tripId, destination, tripStartDate, tripEndDate, tripArrivalWindow, onFlightAdded }) {
-  const [origin, setOrigin] = useState("");
-  const [dest, setDest] = useState(destination || "");
-  const [date, setDate] = useState("");
+const STORAGE_KEY = (tripId, userId) => `flight-search-${tripId}-${userId}`;
+
+export default function FlightSearch({ tripId, destination, tripStartDate, tripEndDate, tripArrivalWindow, onFlightAdded, myFlights = [] }) {
+  const { user } = useAuth();
+  const saved = (() => { try { return JSON.parse(localStorage.getItem(STORAGE_KEY(tripId, user?.id))) || {}; } catch { return {}; } })();
+
+  const [origin, setOrigin] = useState(saved.origin || "");
+  const [dest, setDest] = useState(saved.dest || destination || "");
+  const [date, setDate] = useState(saved.date || "");
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [added, setAdded] = useState(null);
   const [error, setError] = useState("");
+
+  const persist = (field, value) => {
+    try {
+      const current = JSON.parse(localStorage.getItem(STORAGE_KEY(tripId, user?.id))) || {};
+      localStorage.setItem(STORAGE_KEY(tripId, user?.id), JSON.stringify({ ...current, [field]: value }));
+    } catch {}
+  };
 
   const [window_, setWindow] = useState(tripArrivalWindow || null);
   const [showWindowPicker, setShowWindowPicker] = useState(false);
@@ -44,6 +56,8 @@ export default function FlightSearch({ tripId, destination, tripStartDate, tripE
     }
   };
 
+  const existingFlightNums = new Set(myFlights.map((f) => f.flight_number));
+
   const handleAddFlight = async (flight, segment) => {
     try {
       await addFlight({
@@ -55,8 +69,6 @@ export default function FlightSearch({ tripId, destination, tripStartDate, tripE
         departure_time: segment.departing_at,
         arrival_time: segment.arriving_at,
       });
-      setAdded(segment.flight_number);
-      setTimeout(() => setAdded(null), 2500);
       if (onFlightAdded) onFlightAdded();
     } catch {
       setError("Failed to add flight.");
@@ -86,7 +98,7 @@ export default function FlightSearch({ tripId, destination, tripStartDate, tripE
           <input
             placeholder="e.g. LAX JFK etc"
             value={origin}
-            onChange={(e) => setOrigin(e.target.value.toUpperCase())}
+            onChange={(e) => { setOrigin(e.target.value.toUpperCase()); persist("origin", e.target.value.toUpperCase()); }}
             maxLength={4}
           />
         </div>
@@ -95,7 +107,7 @@ export default function FlightSearch({ tripId, destination, tripStartDate, tripE
           <input
             placeholder="e.g. ORD"
             value={dest}
-            onChange={(e) => setDest(e.target.value.toUpperCase())}
+            onChange={(e) => { setDest(e.target.value.toUpperCase()); persist("dest", e.target.value.toUpperCase()); }}
             maxLength={4}
           />
         </div>
@@ -106,7 +118,7 @@ export default function FlightSearch({ tripId, destination, tripStartDate, tripE
             value={date}
             min={tripStartDate || undefined}
             max={tripEndDate || undefined}
-            onChange={(e) => setDate(e.target.value)}
+            onChange={(e) => { setDate(e.target.value); persist("date", e.target.value); }}
           />
         </div>
         <button className="btn btn-primary flight-search-btn" onClick={handleSearch} disabled={loading}>
@@ -130,7 +142,6 @@ export default function FlightSearch({ tripId, destination, tripStartDate, tripE
       </div>
 
       {error && <p className="error-text mt-md">{error}</p>}
-      {added && <p className="text-success mt-md">✓ Flight {added} added to trip!</p>}
 
       {results.length > 0 && (
         <div className="flight-results">
@@ -168,9 +179,18 @@ export default function FlightSearch({ tripId, destination, tripStartDate, tripE
                       </div>
                       <div className="flight-result-right">
                         <div className="flight-price">{flight.total_currency} {flight.total_amount}</div>
-                        <button className="btn btn-primary btn-sm" onClick={() => handleAddFlight(flight, segment)}>
-                          Add to Trip
-                        </button>
+                        {(() => {
+                          const isAdded = existingFlightNums.has(segment.flight_number);
+                          return (
+                            <button
+                              className={`btn btn-sm ${isAdded ? "btn-added" : "btn-primary"}`}
+                              onClick={() => !isAdded && handleAddFlight(flight, segment)}
+                              disabled={isAdded}
+                            >
+                              {isAdded ? "✓ Added" : "Add to Trip"}
+                            </button>
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>

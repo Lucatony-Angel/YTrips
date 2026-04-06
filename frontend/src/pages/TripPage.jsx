@@ -25,6 +25,8 @@ export default function TripPage() {
   const [error, setError] = useState("");
   const [showBannerEdit, setShowBannerEdit] = useState(false);
   const [savingBanner, setSavingBanner] = useState(false);
+  const [confirmDeleteFlight, setConfirmDeleteFlight] = useState(null);
+  const [copiedCode, setCopiedCode] = useState(false);
 
   useEffect(() => {
     Promise.all([getTrip(id), getTripFlights(id), getTripMembers(id)])
@@ -98,6 +100,7 @@ export default function TripPage() {
   const handleDeleteFlight = async (flightId) => {
     try {
       await deleteTripFlight(id, flightId);
+      setConfirmDeleteFlight(null);
       refreshFlights();
     } catch {}
   };
@@ -116,9 +119,17 @@ export default function TripPage() {
           </div>
         </div>
         {canDelete && (
-          <button className="btn btn-delete" onClick={() => handleDeleteFlight(flight.id)}>
-            Delete
-          </button>
+          confirmDeleteFlight === flight.id ? (
+            <div className="flight-delete-confirm">
+              <span>Remove?</span>
+              <button className="confirm-yes" onClick={() => handleDeleteFlight(flight.id)}>Delete</button>
+              <button className="confirm-no" onClick={() => setConfirmDeleteFlight(null)}>Cancel</button>
+            </div>
+          ) : (
+            <button className="btn btn-delete" onClick={() => setConfirmDeleteFlight(flight.id)}>
+              Delete
+            </button>
+          )
         )}
       </div>
     </div>
@@ -128,7 +139,7 @@ export default function TripPage() {
     ? trip.banner_image_url
       ? { backgroundImage: `url(${trip.banner_image_url})`, backgroundSize: "cover", backgroundPosition: "center" }
       : { background: trip.banner_color || "#2D3BE8" }
-    : { background: "#2D3BE8" };
+    : { background: "transparent" };
 
   const myFlights = flightByUser[user?.id] || [];
 
@@ -249,10 +260,10 @@ export default function TripPage() {
                 <code>{trip.invite_code}</code>
                 <button
                   className="btn btn-outline btn-sm"
-                  onClick={() => navigator.clipboard.writeText(trip.invite_code)}
+                  onClick={() => { navigator.clipboard.writeText(trip.invite_code); setCopiedCode(true); setTimeout(() => setCopiedCode(false), 2000); }}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                  Copy
+                  {copiedCode ? "Copied!" : "Copy"}
                 </button>
               </div>
             </div>
@@ -273,6 +284,14 @@ export default function TripPage() {
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                   Group Flights
+                </button>
+                <button
+                  className={`flight-tab${activeTab === "members" ? " active" : ""}`}
+                  onClick={() => setActiveTab("members")}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                  Members
+                  <span className="tab-count">{members.length}</span>
                 </button>
               </div>
 
@@ -317,6 +336,34 @@ export default function TripPage() {
                   })}
                 </div>
               )}
+
+              {activeTab === "members" && (
+                <div className="members-list mt-md">
+                  {sortedMembers.map((member) => {
+                    const isMe = member.user_id === user?.id;
+                    const initials = member.display_name
+                      ? member.display_name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()
+                      : "?";
+                    return (
+                      <div key={member.user_id} className="member-row">
+                        <div className="member-avatar">
+                          {member.avatar_url
+                            ? <img src={member.avatar_url} alt={member.display_name} />
+                            : <span>{initials}</span>
+                          }
+                        </div>
+                        <div className="member-info">
+                          <div className="member-info-top">
+                            <span className="member-info-name">{isMe ? "You" : member.display_name}</span>
+                            {member.role === "owner" && <span className="member-role-badge">Owner</span>}
+                          </div>
+                          <span className="member-info-sub">{member.display_name}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {/* Search */}
@@ -333,6 +380,7 @@ export default function TripPage() {
                     : null
                 }
                 onFlightAdded={refreshFlights}
+                myFlights={myFlights}
               />
             </div>
           </div>
