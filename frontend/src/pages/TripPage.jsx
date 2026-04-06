@@ -71,12 +71,21 @@ export default function TripPage() {
   const [confirmDeleteFlight, setConfirmDeleteFlight] = useState(null);
   const [copiedCode, setCopiedCode] = useState(false);
 
-  // Itinerary form state
+  // Itinerary add form state
   const [itineraryForm, setItineraryForm] = useState(emptyItineraryForm);
-  const [editingItineraryId, setEditingItineraryId] = useState(null);
   const [itinerarySubmitting, setItinerarySubmitting] = useState(false);
   const [itineraryError, setItineraryError] = useState("");
   const [itinerarySuccess, setItinerarySuccess] = useState("");
+
+  // Itinerary edit modal state
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editModalItem, setEditModalItem] = useState(null);
+  const [editModalForm, setEditModalForm] = useState(emptyItineraryForm);
+  const [editModalSubmitting, setEditModalSubmitting] = useState(false);
+  const [editModalError, setEditModalError] = useState("");
+
+  // Itinerary inline delete confirm
+  const [confirmDeleteItinerary, setConfirmDeleteItinerary] = useState(null);
 
   useEffect(() => {
     let isActive = true;
@@ -117,10 +126,62 @@ export default function TripPage() {
   };
 
   const resetItineraryForm = () => {
-    setEditingItineraryId(null);
     setItineraryForm(emptyItineraryForm);
     setItineraryError("");
     setItinerarySuccess("");
+  };
+
+  const openEditModal = (item) => {
+    setEditModalItem(item);
+    setEditModalForm({
+      title: item.title,
+      description: item.description,
+      scheduled_at: toDateTimeLocalValue(item.scheduled_at),
+      location: item.location,
+      category: item.category,
+    });
+    setEditModalError("");
+    setEditModalOpen(true);
+  };
+
+  const closeEditModal = () => {
+    setEditModalOpen(false);
+    setEditModalItem(null);
+    setEditModalForm(emptyItineraryForm);
+    setEditModalError("");
+  };
+
+  const handleEditModalFieldChange = (e) => {
+    const { name, value } = e.target;
+    setEditModalForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSubmitEditModal = async (e) => {
+    e.preventDefault();
+    setEditModalError("");
+    const rawAt = editModalForm.scheduled_at;
+    const scheduled_at = rawAt.length === 16 ? rawAt + ":00" : rawAt;
+    const payload = {
+      title: editModalForm.title.trim(),
+      description: editModalForm.description.trim(),
+      scheduled_at,
+      location: editModalForm.location.trim(),
+      category: editModalForm.category.trim(),
+    };
+    if (!isScheduledWithinTripDates(payload.scheduled_at, trip)) {
+      setEditModalError("Date & time must fall within the trip dates.");
+      return;
+    }
+    setEditModalSubmitting(true);
+    try {
+      await updateTripItineraryItem(id, editModalItem.id, payload);
+      await refreshItinerary();
+      closeEditModal();
+    } catch (err) {
+      setEditModalError(getErrorMessage(err, "Unable to update itinerary item."));
+    } finally {
+      setEditModalSubmitting(false);
+    }
   };
 
   const handleColorChange = async (color) => {
@@ -196,66 +257,41 @@ export default function TripPage() {
     setItineraryForm((current) => ({ ...current, [name]: value }));
   };
 
-  const handleEditItineraryItem = (item) => {
-    setEditingItineraryId(item.id);
-    setItineraryForm({
-      title: item.title,
-      description: item.description,
-      scheduled_at: toDateTimeLocalValue(item.scheduled_at),
-      location: item.location,
-      category: item.category,
-    });
-    setItineraryError("");
-    setItinerarySuccess("");
-  };
-
   const handleSubmitItinerary = async (event) => {
     event.preventDefault();
     setItineraryError("");
     setItinerarySuccess("");
-
+    const rawAt = itineraryForm.scheduled_at;
+    const scheduled_at = rawAt && !rawAt.includes(":") ? rawAt : rawAt.length === 16 ? rawAt + ":00" : rawAt;
     const payload = {
       title: itineraryForm.title.trim(),
       description: itineraryForm.description.trim(),
-      scheduled_at: itineraryForm.scheduled_at,
+      scheduled_at,
       location: itineraryForm.location.trim(),
       category: itineraryForm.category.trim(),
     };
-
     if (!isScheduledWithinTripDates(payload.scheduled_at, trip)) {
       setItineraryError("Date & time must fall within the trip dates.");
       return;
     }
-
     setItinerarySubmitting(true);
     try {
-      if (editingItineraryId) {
-        await updateTripItineraryItem(id, editingItineraryId, payload);
-        setItinerarySuccess("Itinerary item updated.");
-      } else {
-        await createTripItineraryItem(id, payload);
-        setItinerarySuccess("Itinerary item added.");
-      }
+      await createTripItineraryItem(id, payload);
+      setItinerarySuccess("Itinerary item added.");
       await refreshItinerary();
       resetItineraryForm();
     } catch (err) {
-      setItineraryError(
-        getErrorMessage(err, editingItineraryId ? "Unable to update itinerary item." : "Unable to add itinerary item.")
-      );
+      setItineraryError(getErrorMessage(err, "Unable to add itinerary item."));
     } finally {
       setItinerarySubmitting(false);
     }
   };
 
   const handleDeleteItineraryItem = async (itemId) => {
-    if (!window.confirm("Delete this itinerary item?")) return;
-    setItineraryError("");
-    setItinerarySuccess("");
     try {
       await deleteTripItineraryItem(id, itemId);
+      setConfirmDeleteItinerary(null);
       await refreshItinerary();
-      if (editingItineraryId === itemId) resetItineraryForm();
-      setItinerarySuccess("Itinerary item removed.");
     } catch (err) {
       setItineraryError(getErrorMessage(err, "Unable to remove itinerary item."));
     }
@@ -571,15 +607,8 @@ export default function TripPage() {
                     {itineraryError && <p className="error-text">{itineraryError}</p>}
                     {itinerarySuccess && <p className="text-success">{itinerarySuccess}</p>}
                     <div className="itinerary-form-actions">
-                      {editingItineraryId && (
-                        <button type="button" className="btn btn-outline" onClick={resetItineraryForm} disabled={itinerarySubmitting}>
-                          Cancel
-                        </button>
-                      )}
                       <button type="submit" className="btn btn-primary" disabled={itinerarySubmitting}>
-                        {itinerarySubmitting
-                          ? editingItineraryId ? "Saving…" : "Adding…"
-                          : editingItineraryId ? "Save Changes" : "Add Item"}
+                        {itinerarySubmitting ? "Adding…" : "Add Item"}
                       </button>
                     </div>
                   </form>
@@ -608,12 +637,22 @@ export default function TripPage() {
                               {item.description && <p className="itinerary-description">{item.description}</p>}
                             </div>
                             <div className="itinerary-actions">
-                              <button type="button" className="btn btn-outline btn-sm" onClick={() => handleEditItineraryItem(item)}>
-                                Edit
-                              </button>
-                              <button type="button" className="btn btn-delete" onClick={() => handleDeleteItineraryItem(item.id)}>
-                                Delete
-                              </button>
+                              {confirmDeleteItinerary === item.id ? (
+                                <div className="flight-delete-confirm">
+                                  <span>Remove?</span>
+                                  <button className="confirm-yes" onClick={() => handleDeleteItineraryItem(item.id)}>Delete</button>
+                                  <button className="confirm-no" onClick={() => setConfirmDeleteItinerary(null)}>Cancel</button>
+                                </div>
+                              ) : (
+                                <>
+                                  <button type="button" className="btn btn-outline btn-sm" onClick={() => openEditModal(item)}>
+                                    Edit
+                                  </button>
+                                  <button type="button" className="btn btn-delete" onClick={() => setConfirmDeleteItinerary(item.id)}>
+                                    Delete
+                                  </button>
+                                </>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -678,6 +717,59 @@ export default function TripPage() {
           </div>
         )}
       </div>
+
+      {/* Edit itinerary modal */}
+      {editModalOpen && (
+        <div className="modal-overlay" onClick={closeEditModal}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Edit Itinerary Item</h3>
+              <button className="modal-close" onClick={closeEditModal}>✕</button>
+            </div>
+            <form onSubmit={handleSubmitEditModal}>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Title</label>
+                  <input name="title" value={editModalForm.title} onChange={handleEditModalFieldChange} required />
+                </div>
+                <div className="form-group">
+                  <label>Category</label>
+                  <input name="category" value={editModalForm.category} onChange={handleEditModalFieldChange} required />
+                </div>
+              </div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Date &amp; Time</label>
+                  <input
+                    type="datetime-local"
+                    name="scheduled_at"
+                    value={editModalForm.scheduled_at}
+                    onChange={handleEditModalFieldChange}
+                    min={getTripDateTimeBoundary(trip?.start_date)}
+                    max={getTripDateTimeBoundary(trip?.end_date, true)}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Location</label>
+                  <input name="location" value={editModalForm.location} onChange={handleEditModalFieldChange} required />
+                </div>
+              </div>
+              <div className="form-group">
+                <label>Description</label>
+                <textarea name="description" value={editModalForm.description} onChange={handleEditModalFieldChange} rows={3} required />
+              </div>
+              {editModalError && <p className="error-text">{editModalError}</p>}
+              <div className="modal-actions">
+                <button type="button" className="btn btn-outline" onClick={closeEditModal} disabled={editModalSubmitting}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={editModalSubmitting}>
+                  {editModalSubmitting ? "Saving…" : "Save Changes"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

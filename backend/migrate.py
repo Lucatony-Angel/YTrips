@@ -22,4 +22,17 @@ with engine.begin() as conn:
     conn.execute(text(
         "ALTER TABLE trips ADD COLUMN IF NOT EXISTS banner_image_url TEXT"
     ))
-    print("Migration complete: banner_color and banner_image_url added to trips.")
+    conn.execute(text("""
+        CREATE TABLE IF NOT EXISTS itinerary_items (
+            id SERIAL PRIMARY KEY,
+            trip_id INTEGER NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+            created_by_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            title VARCHAR(150) NOT NULL,
+            description TEXT NOT NULL,
+            scheduled_at TIMESTAMP NOT NULL,
+            location VARCHAR(150) NOT NULL,
+            category VARCHAR(80) NOT NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+    """))
+    print("Migration complete: banner columns + itinerary_items table.")

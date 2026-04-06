@@ -674,9 +674,12 @@
   display: flex; align-items: center; justify-content: center;
   z-index: 200; padding: 24px;
 }
-.modal { background: #fff; border-radius: 14px; padding: 32px; width: 100%; max-width: 500px; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+.modal, .modal-box { background: #fff; border-radius: 14px; padding: 36px; width: 100%; max-width: 580px; box-shadow: 0 20px 60px rgba(0,0,0,0.2); display: flex; flex-direction: column; gap: 0; }
+.modal-box form { display: flex; flex-direction: column; gap: 18px; }
+.modal-box .form-row { gap: 16px; }
+.modal-box .modal-actions { margin-top: 8px; }
 .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-.modal-header h2 { font-size: 20px; font-weight: 700; }
+.modal-header h2, .modal-header h3 { font-size: 18px; font-weight: 700; }
 .modal-close { background: none; border: none; font-size: 22px; color: var(--subtext); cursor: pointer; line-height: 1; padding: 0; }
 .modal-form { display: flex; flex-direction: column; gap: 16px; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
