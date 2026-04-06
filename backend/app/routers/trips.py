@@ -189,6 +189,10 @@ def join_trip(
     db.commit()
     return {"message": "Joined successfully"}
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> refs/rewritten/Merge-feature-rishi2-into-main
 @router.get("/{trip_id}/itinerary", response_model=list[ItineraryItemResponse])
 def get_trip_itinerary(
     trip_id: int,
@@ -259,4 +263,8 @@ def delete_itinerary_item(
         raise HTTPException(status_code=403, detail="Not your item")
     db.delete(item)
     db.commit()
+<<<<<<< HEAD
     return {"message": "Deleted"}
+=======
+    return {"message": "Deleted"}
+>>>>>>> refs/rewritten/Merge-feature-rishi2-into-main
