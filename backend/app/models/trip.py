@@ -1,7 +1,7 @@
 from datetime import date, datetime, timezone
 import uuid
 
-from sqlalchemy import Date, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Date, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.database import Base
@@ -25,3 +25,9 @@ class Trip(Base):
 
     banner_color: Mapped[str] = mapped_column(String(7), nullable=False, default="#2D3BE8", server_default="#2D3BE8")
     banner_image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    group_window_start: Mapped[str | None] = mapped_column(String(5), nullable=True)
+    group_window_end: Mapped[str | None] = mapped_column(String(5), nullable=True)
+    group_window_checked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    group_window_combined_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    group_window_currency: Mapped[str | None] = mapped_column(String(3), nullable=True)

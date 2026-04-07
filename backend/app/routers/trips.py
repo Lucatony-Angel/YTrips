@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -8,13 +9,13 @@ from app.models.user import User
 from app.models.trip import Trip
 from app.models.trip_member import TripMember
 from app.models.flight import Flight
-from app.schemas.trip import TripCreate, TripBannerUpdate, TripResponse, TripMemberResponse
+from app.schemas.trip import TripCreate, TripBannerUpdate, TripResponse, TripMemberResponse, GroupWindowSave
 from app.schemas.flight import FlightResponse
 from app.schemas.itinerary import ItineraryItemCreate, ItineraryItemUpdate, ItineraryItemResponse
 from app.models.itinerary_item import ItineraryItem
 from app.services.trip_services import create_trip, get_user_trips
 from app.services.flight_search_services import find_group_windows
-from app.schemas.flight_search import FlightOfferRead, GroupWindow
+from app.schemas.flight_search import GroupWindow
 
 router = APIRouter()
 
@@ -359,3 +360,29 @@ def group_search_for_trip(
         raise HTTPException(status_code=400, detail="No members have a home airport set")
 
     return find_group_windows(origins, destination_iata.upper(), departure_date)
+
+
+@router.patch("/{trip_id}/group-window", response_model=TripResponse)
+def save_group_window(
+    trip_id: int,
+    body: GroupWindowSave,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    trip = (
+        db.query(Trip)
+        .join(TripMember, Trip.id == TripMember.trip_id)
+        .filter(Trip.id == trip_id, TripMember.user_id == current_user.id)
+        .first()
+    )
+    if not trip:
+        raise HTTPException(status_code=404, detail="Trip not found")
+
+    trip.group_window_start = body.window_start
+    trip.group_window_end = body.window_end
+    trip.group_window_combined_price = body.total_cheapest_combined
+    trip.group_window_currency = body.currency
+    trip.group_window_checked_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(trip)
+    return trip

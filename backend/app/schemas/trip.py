@@ -2,6 +2,13 @@ from datetime import date, datetime
 from pydantic import BaseModel
 
 
+class GroupWindowSave(BaseModel):
+    window_start: str
+    window_end: str
+    total_cheapest_combined: float
+    currency: str
+
+
 class TripBannerUpdate(BaseModel):
     banner_color: str | None = None
     banner_image_url: str | None = None
@@ -40,6 +47,11 @@ class TripResponse(BaseModel):
     banner_color: str
     banner_image_url: str | None = None
     member_count: int | None = None
+    group_window_start: str | None = None
+    group_window_end: str | None = None
+    group_window_checked_at: datetime | None = None
+    group_window_combined_price: float | None = None
+    group_window_currency: str | None = None
 
     class Config:
         from_attributes = True
