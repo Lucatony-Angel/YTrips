@@ -35,4 +35,6 @@ with engine.begin() as conn:
             created_at TIMESTAMP NOT NULL DEFAULT NOW()
         )
     """))
-    print("Migration complete: banner columns + itinerary_items table.")
+    conn.execute(text(
+        "ALTER TABLE trip_members ADD COLUMN IF NOT EXISTS home_airport VARCHAR(10)"
+    ))

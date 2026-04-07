@@ -22,6 +22,7 @@ class TripMemberResponse(BaseModel):
     display_name: str
     avatar_url: str | None = None
     role: str
+    home_airport: str | None = None
 
     class Config:
         from_attributes = True

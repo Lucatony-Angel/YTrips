@@ -13,6 +13,8 @@ from app.schemas.flight import FlightResponse
 from app.schemas.itinerary import ItineraryItemCreate, ItineraryItemUpdate, ItineraryItemResponse
 from app.models.itinerary_item import ItineraryItem
 from app.services.trip_services import create_trip, get_user_trips
+from app.services.flight_search_services import group_flight_search
+from app.schemas.flight_search import FlightOfferRead
 
 router = APIRouter()
 
@@ -88,6 +90,7 @@ def get_trip_members(
             display_name=u.display_name,
             avatar_url=u.avatar_url,
             role=tm.role,
+            home_airport=tm.home_airport or u.home_airport,
         )
         for tm, u in rows
     ]
@@ -295,3 +298,73 @@ def delete_itinerary_item(
     db.commit()
 
     return {"message": "Deleted"}
+# --- Start of group flight search endpoints ---
+# -------- GROUP FLIGHT SEARCH --------
+
+@router.patch("/{trip_id}/members/me/home-airport")
+def set_my_home_airport(
+    trip_id: int,
+    body: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    member = db.query(TripMember).filter(
+        TripMember.trip_id == trip_id,
+        TripMember.user_id == current_user.id,
+    ).first()
+    if not member:
+        raise HTTPException(status_code=403, detail="Not a member of this trip")
+
+    airport = body.get("home_airport", "").strip().upper()
+    if not airport:
+        raise HTTPException(status_code=422, detail="home_airport is required")
+
+    member.home_airport = airport
+    db.commit()
+    return {"home_airport": member.home_airport}
+
+
+@router.get("/{trip_id}/group-search", response_model=dict[str, list[FlightOfferRead]])
+def group_search_for_trip(
+    trip_id: int,
+    departure_date: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    # pull information about the trip, and the user on the trip
+    trip = (
+        db.query(Trip)
+        .join(TripMember, Trip.id == TripMember.trip_id)
+        .filter(Trip.id == trip_id, TripMember.user_id == current_user.id)
+        .first()
+    )
+    if not trip:
+        raise HTTPException(status_code=404, detail="Trip not found")
+
+    if not trip.arrival_window_start or not trip.arrival_window_end:
+        raise HTTPException(status_code=400, detail="Trip has no arrival window set")
+
+    rows = (
+        db.query(TripMember, User)
+        .join(User, TripMember.user_id == User.id)
+        .filter(TripMember.trip_id == trip_id)
+        .all()
+    )
+    
+    # get all the origins
+    origins = list({
+        tm.home_airport or u.home_airport
+        for tm, u in rows
+        if (tm.home_airport or u.home_airport)
+    })
+
+    if not origins:
+        raise HTTPException(status_code=400, detail="No members have a home airport set")
+
+    arrival_window = {
+        "from": trip.arrival_window_start.strftime("%H:%M"),
+        "to": trip.arrival_window_end.strftime("%H:%M"),
+    }
+
+    results = group_flight_search(origins, trip.destination_name, departure_date, arrival_window)
+    return results
