@@ -38,3 +38,8 @@ with engine.begin() as conn:
     conn.execute(text(
         "ALTER TABLE trip_members ADD COLUMN IF NOT EXISTS home_airport VARCHAR(10)"
     ))
+    conn.execute(text("ALTER TABLE trips ADD COLUMN IF NOT EXISTS group_window_start VARCHAR(5)"))
+    conn.execute(text("ALTER TABLE trips ADD COLUMN IF NOT EXISTS group_window_end VARCHAR(5)"))
+    conn.execute(text("ALTER TABLE trips ADD COLUMN IF NOT EXISTS group_window_checked_at TIMESTAMP"))
+    conn.execute(text("ALTER TABLE trips ADD COLUMN IF NOT EXISTS group_window_combined_price FLOAT"))
+    conn.execute(text("ALTER TABLE trips ADD COLUMN IF NOT EXISTS group_window_currency VARCHAR(3)"))
