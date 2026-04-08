@@ -73,21 +73,20 @@ export default function TripPage() {
   const [confirmDeleteFlight, setConfirmDeleteFlight] = useState(null);
   const [copiedCode, setCopiedCode] = useState(false);
 
-  // Itinerary add form state
   const [itineraryForm, setItineraryForm] = useState(emptyItineraryForm);
   const [itinerarySubmitting, setItinerarySubmitting] = useState(false);
   const [itineraryError, setItineraryError] = useState("");
   const [itinerarySuccess, setItinerarySuccess] = useState("");
 
-  // Itinerary edit modal state
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editModalItem, setEditModalItem] = useState(null);
   const [editModalForm, setEditModalForm] = useState(emptyItineraryForm);
   const [editModalSubmitting, setEditModalSubmitting] = useState(false);
   const [editModalError, setEditModalError] = useState("");
 
-  // Itinerary inline delete confirm
   const [confirmDeleteItinerary, setConfirmDeleteItinerary] = useState(null);
+
+  const [confirmSoloNoVote, setConfirmSoloNoVote] = useState(null);
 
   useEffect(() => {
     let isActive = true;
@@ -116,8 +115,12 @@ export default function TripPage() {
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
-        const data = await getTripItinerary(id);
-        setItineraryItems(data);
+        const [itineraryData, memberData] = await Promise.all([
+          getTripItinerary(id),
+          getTripMembers(id),
+        ]);
+        setItineraryItems(itineraryData);
+        setMembers(memberData);
       } catch {}
     }, 4000);
     return () => clearInterval(interval);
@@ -325,11 +328,26 @@ export default function TripPage() {
   };
 
   const handleVote = async (itemId, vote) => {
+    if (vote === false && members.length === 1) {
+      setConfirmSoloNoVote(itemId);
+      return;
+    }
     const item = itineraryItems.find((i) => i.id === itemId);
     if (item?.user_vote === vote) {
       await removeItineraryVote(id, itemId);
     } else {
       await voteOnItineraryItem(id, itemId, vote);
+    }
+    await refreshItinerary();
+  }
+
+  const handleConfirmSoloNoVote = async (itemId) => {
+    setConfirmSoloNoVote(null);
+    const item = itineraryItems.find((i) => i.id === itemId);
+    if (item?.user_vote === false) {
+      await removeItineraryVote(id, itemId);
+    } else {
+      await voteOnItineraryItem(id, itemId, false);
     }
     await refreshItinerary();
   }
@@ -671,12 +689,20 @@ export default function TripPage() {
                                 >
                                   <span style={{ color: item.user_vote === true ? "#fff" : "#16a34a" }}>👍</span> {item.yes_votes}
                                 </button>
-                                <button
-                                  className={`btn btn-vote${item.user_vote === false ? " vote-active-no" : ""}`}
-                                  onClick={() => handleVote(item.id, false)}
-                                >
-                                  <span style={{ color: item.user_vote === false ? "#fff" : "#dc2626" }}>👎</span> {item.no_votes}
-                                </button>
+                                {confirmSoloNoVote === item.id ? (
+                                  <div className="flight-delete-confirm">
+                                    <span>You're the only member — voting No will delete this item. Continue?</span>
+                                    <button className="btn btn-danger btn-xs" onClick={() => handleConfirmSoloNoVote(item.id)}>Yes, delete</button>
+                                    <button className="btn btn-outline btn-xs" onClick={() => setConfirmSoloNoVote(null)}>Cancel</button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    className={`btn btn-vote${item.user_vote === false ? " vote-active-no" : ""}`}
+                                    onClick={() => handleVote(item.id, false)}
+                                  >
+                                    <span style={{ color: item.user_vote === false ? "#fff" : "#dc2626" }}>👎</span> {item.no_votes}
+                                  </button>
+                                )}
                                 {(item.yes_votes + item.no_votes) > 0 && (
                                   <span className="vote-approval">
                                     {Math.round((item.yes_votes / (item.yes_votes + item.no_votes)) * 100)}% approval
