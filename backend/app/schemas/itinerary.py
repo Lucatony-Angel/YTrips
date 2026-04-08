@@ -24,6 +24,9 @@ class ItineraryItemResponse(ItineraryItemBase):
     trip_id: int
     created_by_user_id: int
     created_at: datetime
+    yes_votes: int = 0
+    no_votes: int = 0
+    user_vote: bool | None = None
 
     class Config:
         from_attributes = True

@@ -15,6 +15,7 @@ from app.models.itinerary_item import ItineraryItem
 from app.services.trip_services import create_trip, get_user_trips
 from app.services.flight_search_services import group_flight_search
 from app.schemas.flight_search import FlightOfferRead
+from app.models.Itinerary_vote import ItineraryVote
 
 router = APIRouter()
 
@@ -218,10 +219,85 @@ def get_trip_itinerary(
     if not member:
         raise HTTPException(status_code=403, detail="Not a member of this trip")
 
-    return db.query(ItineraryItem)\
+    items = ( db.query(ItineraryItem)\
         .filter(ItineraryItem.trip_id == trip_id)\
         .order_by(ItineraryItem.scheduled_at)\
-        .all()
+        .all())
+    
+    item_ids = [item.id for item in items]
+    votes = db.query(ItineraryVote).filter(ItineraryVote.item_id.in_(item_ids)).all()
+
+    yes_counts: dict[int, int] = {}
+    no_counts: dict[int, int] = {}
+    user_votes: dict[int, bool] = {}
+
+    for vote in votes:
+        if vote.vote:
+            yes_counts[vote.item_id] = yes_counts.get(vote.item_id, 0) + 1
+        else:
+            no_counts[vote.item_id] = no_counts.get(vote.item_id, 0) + 1
+        if vote.user_id == current_user.id:
+            user_votes[vote.item_id] = vote.vote
+
+    result = []
+    for item in items:
+        r = ItineraryItemResponse.model_validate(item)
+        r.yes_votes = yes_counts.get(item.id, 0)
+        r.no_votes = no_counts.get(item.id, 0)
+        r.user_vote = user_votes.get(item.id, None)
+        result.append(r)
+
+    return result
+
+@router.post("/{trip_id}/itinerary/{item_id}/vote")
+def cast_vote(
+    trip_id: int,
+    item_id: int,
+    body: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    member = db.query(TripMember).filter(
+        TripMember.trip_id == trip_id,
+        TripMember.user_id == current_user.id,
+    ).first()
+    if not member:
+        raise HTTPException(status_code=403, detail="Not a member of this trip")
+
+    vote_value = body.get("vote")
+    if vote_value is None:
+        raise HTTPException(status_code=422, detail="vote is required")
+
+    existing = db.query(ItineraryVote).filter(
+        ItineraryVote.item_id == item_id,
+        ItineraryVote.user_id == current_user.id,
+    ).first()
+
+    if existing:
+        existing.vote = vote_value
+    else:
+        db.add(ItineraryVote(item_id=item_id, user_id=current_user.id, vote=vote_value))
+
+    db.commit()
+    return {"message": "Vote cast"}
+
+
+@router.delete("/{trip_id}/itinerary/{item_id}/vote")
+def remove_vote(
+    trip_id: int,
+    item_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    vote = db.query(ItineraryVote).filter(
+        ItineraryVote.item_id == item_id,
+        ItineraryVote.user_id == current_user.id,
+    ).first()
+    if not vote:
+        raise HTTPException(status_code=404, detail="No vote found")
+    db.delete(vote)
+    db.commit()
+    return {"message": "Vote removed"}
 
 
 @router.post("/{trip_id}/itinerary", response_model=ItineraryItemResponse)

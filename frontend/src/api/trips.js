@@ -45,6 +45,16 @@ export async function deleteTripItineraryItem(tripId, itemId) {
   return res.data;
 }
 
+export async function voteOnItineraryItem(tripId, itemId, vote) {
+  const res = await api.post(`/api/trips/${tripId}/itinerary/${itemId}/vote`, { vote });
+  return res.data;
+}
+
+export async function removeItineraryVote(tripId, itemId) {
+  const res = await api.delete(`/api/trips/${tripId}/itinerary/${itemId}/vote`);
+  return res.data;
+}
+
 export async function deleteTripFlight(tripId, flightId) {
   const res = await api.delete(`/api/trips/${tripId}/flights/${flightId}`);
   return res.data;

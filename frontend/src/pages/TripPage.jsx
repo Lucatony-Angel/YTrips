@@ -8,9 +8,11 @@ import {
   getTrip,
   getTripFlights,
   getTripItinerary,
-  getTripMembers,
+  getTripMembers, 
   updateTripBanner,
   updateTripItineraryItem,
+  voteOnItineraryItem,
+  removeItineraryVote
 } from "../api/trips";
 import Navbar from "../components/Navbar";
 import FlightSearch from "../components/FlightSearch";
@@ -236,6 +238,21 @@ export default function TripPage() {
     members.map((m) => [m.user_id, m.user_id === user?.id ? "You" : m.display_name])
   );
 
+  const conflictedItemIds = new Set();
+  const byTime = {}
+  for (const item of itineraryItems) {
+    const key = item.scheduled_at;
+    if (!byTime[key]) byTime[key] = [];
+    byTime[key].push(item);
+  }
+  for (const group of Object.values(byTime)) {
+    if (group.length < 2) continue;
+    const maxVotes = Math.max(...group.map((i) => i.yes_votes));
+    for (const item of group) {
+      if (item.yes_votes < maxVotes) conflictedItemIds.add(item.id);
+    }
+  }
+
   const sortedMembers = [...members].sort((a, b) => {
     if (a.user_id === user?.id) return -1;
     if (b.user_id === user?.id) return 1;
@@ -296,6 +313,16 @@ export default function TripPage() {
       setItineraryError(getErrorMessage(err, "Unable to remove itinerary item."));
     }
   };
+
+  const handleVote = async (itemId, vote) => {
+    const item = itineraryItems.find((i) => i.id === itemId);
+    if (item?.user_vote === vote) {
+      await removeItineraryVote(id, itemId);
+    } else {
+      await voteOnItineraryItem(id, itemId, vote);
+    }
+    await refreshItinerary();
+  }
 
   const FlightCard = ({ flight, canDelete }) => (
     <div className="flight-result-card">
@@ -627,6 +654,25 @@ export default function TripPage() {
                                 <span>Added by {memberNameById[item.created_by_user_id] || "A trip member"}</span>
                               </div>
                               {item.description && <p className="itinerary-description">{item.description}</p>}
+                              <div className="itinerary-vote-row">
+                                <button
+                                  className={`btn btn-vote${item.user_vote === true ? " vote-active-yes" : ""}`}
+                                  onClick={() => handleVote(item.id, true)}
+                                >
+                                {item.yes_votes}
+                                </button>
+                                <button
+                                  className={`btn btn-vote${item.user_vote === false ? " vote-active-no" : ""}`}
+                                  onClick={() => handleVote(item.id, false)}
+                                >
+                                {item.no_votes}
+                                </button>
+                                {(item.yes_votes + item.no_votes) > 0 && (
+                                  <span className="vote-approval">
+                                    {Math.round((item.yes_votes / (item.yes_votes + item.no_votes)) * 100)}% approval
+                                  </span>
+                                )}
+                              </div>
                             </div>
                             <div className="itinerary-actions">
                               {confirmDeleteItinerary === item.id ? (

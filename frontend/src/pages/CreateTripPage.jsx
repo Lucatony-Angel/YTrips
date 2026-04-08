@@ -177,6 +177,7 @@ export default function CreateTripPage() {
                   <label>Start Date *</label>
                   <input
                     type="date"
+                    lang="en-US"
                     name="start_date"
                     value={form.start_date}
                     onChange={handleChange}
@@ -186,6 +187,7 @@ export default function CreateTripPage() {
                   <label>End Date *</label>
                   <input
                     type="date"
+                    lang="en-US"
                     name="end_date"
                     value={form.end_date}
                     min={form.start_date || undefined}
