@@ -29,7 +29,10 @@ export default function JoinTripPage() {
     } catch (err) {
       const detail = err.response?.data?.detail;
       if (detail === "Already a member") {
-        setError("You're already a member of this trip.");
+        const trips = await getTrips();
+        const existing = trips.find((t) => t.invite_code === trimmed);
+        navigate(existing ? `/trips/${existing.id}` : "/", { replace: true });
+        return;
       } else if (detail === "Invalid invite code") {
         setError("That invite code doesn't exist. Double-check and try again.");
       } else {

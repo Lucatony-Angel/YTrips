@@ -225,6 +225,64 @@
   font-size: 14px;
 }
 
+/* Voting */
+.itinerary-vote-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.btn-vote {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--subtext);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.btn-vote:hover {
+  background: var(--bg-subtle);
+  color: var(--text);
+}
+
+.vote-active-yes {
+  background: #dcfce7;
+  border-color: #16A34A;
+  color: #15803d;
+  font-weight: 600;
+}
+
+.vote-active-no {
+  background: #fee2e2;
+  border-color: #DC2626;
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+.vote-approval {
+  font-size: 12px;
+  color: var(--subtext);
+  margin-left: 4px;
+}
+
+.itinerary-conflict {
+  border-left: 3px solid #DC2626;
+  opacity: 0.75;
+}
+
+.conflict-warning {
+  font-size: 12px;
+  color: #DC2626;
+  margin-top: 6px;
+}
+
 /* Flight search */
 .flight-search { display: flex; flex-direction: column; }
 .flight-search-form { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
