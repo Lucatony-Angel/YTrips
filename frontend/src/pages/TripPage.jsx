@@ -113,6 +113,16 @@ export default function TripPage() {
     return () => { isActive = false; };
   }, [id]);
 
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const data = await getTripItinerary(id);
+        setItineraryItems(data);
+      } catch {}
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [id]);
+
   const refreshFlights = async () => {
     try {
       const data = await getTripFlights(id);
@@ -659,13 +669,13 @@ export default function TripPage() {
                                   className={`btn btn-vote${item.user_vote === true ? " vote-active-yes" : ""}`}
                                   onClick={() => handleVote(item.id, true)}
                                 >
-                                {item.yes_votes}
+                                  <span style={{ color: item.user_vote === true ? "#fff" : "#16a34a" }}>👍</span> {item.yes_votes}
                                 </button>
                                 <button
                                   className={`btn btn-vote${item.user_vote === false ? " vote-active-no" : ""}`}
                                   onClick={() => handleVote(item.id, false)}
                                 >
-                                {item.no_votes}
+                                  <span style={{ color: item.user_vote === false ? "#fff" : "#dc2626" }}>👎</span> {item.no_votes}
                                 </button>
                                 {(item.yes_votes + item.no_votes) > 0 && (
                                   <span className="vote-approval">

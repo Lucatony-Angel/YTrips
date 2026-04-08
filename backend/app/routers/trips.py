@@ -204,7 +204,55 @@ def join_trip(
     return {"message": "Joined successfully"}
 
 
-# -------- ITINERARY ROUTES --------
+
+
+def _run_vote_cleanup(db: Session, trip_id: int, item_id: int) -> None:
+    """After any vote change, enforce the two auto-cleanup rules."""
+    member_count = db.query(TripMember).filter(TripMember.trip_id == trip_id).count()
+
+    item = db.query(ItineraryItem).filter(ItineraryItem.id == item_id).first()
+    if not item:
+        return
+
+    scheduled_at = item.scheduled_at
+
+
+    item_votes = db.query(ItineraryVote).filter(ItineraryVote.item_id == item_id).all()
+    if member_count > 0 and len(item_votes) == member_count:
+        yes = sum(1 for v in item_votes if v.vote)
+        total = len(item_votes)
+        if total > 0 and yes / total < 0.5:
+            db.query(ItineraryVote).filter(ItineraryVote.item_id == item_id).delete()
+            db.delete(item)
+            db.commit()
+            item = None
+
+    siblings = db.query(ItineraryItem).filter(
+        ItineraryItem.trip_id == trip_id,
+        ItineraryItem.scheduled_at == scheduled_at,
+    ).all()
+
+    if len(siblings) > 1:
+        sib_ids = [s.id for s in siblings]
+        votes = db.query(ItineraryVote).filter(ItineraryVote.item_id.in_(sib_ids)).all()
+
+        vote_counts = {s.id: 0 for s in siblings}
+        yes_counts = {s.id: 0 for s in siblings}
+        for v in votes:
+            vote_counts[v.item_id] += 1
+            if v.vote:
+                yes_counts[v.item_id] += 1
+
+        all_voted = all(vote_counts[iid] == member_count for iid in sib_ids)
+        if all_voted and member_count > 0:
+            max_yes = max(yes_counts.values())
+            winners = [iid for iid, cnt in yes_counts.items() if cnt == max_yes]
+            if len(winners) == 1:
+                for sibling in siblings:
+                    if sibling.id != winners[0]:
+                        db.query(ItineraryVote).filter(ItineraryVote.item_id == sibling.id).delete()
+                        db.delete(sibling)
+                db.commit()
 
 @router.get("/{trip_id}/itinerary", response_model=list[ItineraryItemResponse])
 def get_trip_itinerary(
@@ -279,6 +327,7 @@ def cast_vote(
         db.add(ItineraryVote(item_id=item_id, user_id=current_user.id, vote=vote_value))
 
     db.commit()
+    _run_vote_cleanup(db, trip_id, item_id)
     return {"message": "Vote cast"}
 
 
@@ -297,6 +346,7 @@ def remove_vote(
         raise HTTPException(status_code=404, detail="No vote found")
     db.delete(vote)
     db.commit()
+    _run_vote_cleanup(db, trip_id, item_id)
     return {"message": "Vote removed"}
 
 
