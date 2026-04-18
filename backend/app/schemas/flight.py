@@ -1,5 +1,6 @@
 from datetime import datetime
 from pydantic import BaseModel, Field, model_validator
+from app.services.airport_registry import is_valid_airport_code
 
 
 class FlightCreate(BaseModel):
@@ -19,10 +20,16 @@ class FlightCreate(BaseModel):
             raise ValueError("departure and arrival airports cannot be the same")
         return self
     
-    @model_validator(model="after")
+    @model_validator(mode="after")
     def normalize_airports(self):
-        self.departure_airport = self.departure_airport.strip().upper()
-        self.arrival_airport = self.arrival_airport.strip().upper()
+        dep = self.departure_airport.strip().upper()
+        arr = self.arrival_airport.strip().upper()
+        if not is_valid_airport_code(dep):
+            raise ValueError(f"'{dep}' is not a recognized airport code")
+        if not is_valid_airport_code(arr):
+            raise ValueError(f"'{arr}' is not a recognized airport code")
+        self.departure_airport = dep
+        self.arrival_airport = arr
         return self
 
 

@@ -2,11 +2,10 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getTrips, deleteTrip } from "../api/trips";
 
-const [fetchError, setFetchError] = useState("");
-
 export default function TripDashboard({ refreshTrigger, onNewTrip }) {
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState("");
   const [copied, setCopied] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null); // trip id pending delete
   const navigate = useNavigate();

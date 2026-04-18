@@ -2,6 +2,7 @@ from datetime import date
 from pydantic import BaseModel, Field, field_validator, model_validator
 from typing import List
 import re
+from app.services.airport_registry import is_valid_airport_code
 
 class ArrivalWindow(BaseModel):
     from_time: str = Field(..., alias="from")
@@ -9,7 +10,7 @@ class ArrivalWindow(BaseModel):
 
     model_config = {"populate_by_name": True}
 
-    @field_validator("from_time", "to time")
+    @field_validator("from_time", "to_time")
     @classmethod
     def validate_time_format(cls, v: str) -> str:
         if not re.match(r"^\d{2}:\d{2}$", v):
@@ -34,7 +35,10 @@ class FlightSearchRequest(BaseModel):
     @field_validator("origin", "destination")
     @classmethod
     def normalize_airports(cls, v: str) -> str:
-        return v.strip().upper()
+        code = v.strip().upper()
+        if not is_valid_airport_code(code):
+            raise ValueError(f"'{code}' is not a recognized airport code")
+        return code
     
     @field_validator("departure_date")
     @classmethod
@@ -45,7 +49,7 @@ class FlightSearchRequest(BaseModel):
             raise ValueError("must be in YYYY-MM-DD format")
         if parsed < date.today():
             raise ValueError("departure_date cannot be in the past")
-        return self
+        return v
 
 class GroupFlightSearchRequest(BaseModel):
     origins: List[str] = Field(..., min_length=1)   # one IATA per member, e.g. ["JFK", etc etc]
@@ -58,13 +62,21 @@ class GroupFlightSearchRequest(BaseModel):
     def normalize_orgins(cls, v: List[str]) -> List[str]:
         codes = [c.strip().upper() for c in v]
         for code in codes:
-            if not re.match(r"^[A-Z]{3,4}$", code):
-                raise ValueError(f"'{code}' is not a valid IATA/ICAO airport code")
+            if not is_valid_airport_code(code):
+                raise ValueError(f"'{code}' is not a recognized airport code")
         return codes
-        
+
     @field_validator("destination")
     @classmethod
     def normalize_destination(cls, v: str) -> str:
+        code = v.strip().upper()
+        if not is_valid_airport_code(code):
+            raise ValueError(f"'{code}' is not a recognized airport code")
+        return code
+
+    @field_validator("departure_date")
+    @classmethod
+    def validate_departure_date(cls, v: str) -> str:
         try:
             parsed = date.fromisoformat(v)
         except ValueError:

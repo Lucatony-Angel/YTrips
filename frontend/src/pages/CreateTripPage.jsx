@@ -13,9 +13,18 @@ const PRESET_COLORS = [
 const fmtWindow = (iso) =>
   iso ? new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }) : null;
 
+const getTodayIsoDate = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 export default function CreateTripPage() {
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
+  const today = getTodayIsoDate();
 
   const [form, setForm] = useState({
     name: "",
@@ -62,6 +71,10 @@ export default function CreateTripPage() {
       setError("Please fill in all required fields.");
       return;
     }
+    if (form.start_date < today) {
+      setError("Start date cannot be in the past.");
+      return;
+    }
     if (form.start_date > form.end_date) {
       setError("End date must be on or after start date.");
       return;
@@ -71,8 +84,16 @@ export default function CreateTripPage() {
       setLoading(true);
       await createTrip(form);
       navigate("/");
-    } catch {
-      setError("Failed to create trip. Please try again.");
+    } catch (err) {
+      const data = err?.response?.data;
+      const errors = data?.errors;
+      if (Array.isArray(errors) && errors.length > 0) {
+        setError(errors.map((e) => e.message.replace(/^Value error,\s*/i, "")).join(" "));
+      } else if (typeof data?.detail === "string" && data.detail !== "Validation error") {
+        setError(data.detail);
+      } else {
+        setError("Failed to create trip. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -180,6 +201,7 @@ export default function CreateTripPage() {
                     lang="en-US"
                     name="start_date"
                     value={form.start_date}
+                    min={today}
                     onChange={handleChange}
                   />
                 </div>
@@ -190,7 +212,7 @@ export default function CreateTripPage() {
                     lang="en-US"
                     name="end_date"
                     value={form.end_date}
-                    min={form.start_date || undefined}
+                    min={form.start_date || today}
                     onChange={handleChange}
                   />
                 </div>

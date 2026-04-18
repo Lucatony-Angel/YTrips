@@ -40,7 +40,8 @@ export default function FlightSearch({ tripId, destination, tripStartDate, tripE
       return;
     }
     if (!iataRegex.test(dest)) {
-      setError("Destination must be a 3-4 letter airport code (e.g. LAX).")
+      setError("Destination must be a 3-4 letter airport code (e.g. LAX).");
+      return;
     }
     if (tripStartDate && date < tripStartDate) {
       setError(`Flight date cannot be before the trip start (${tripStartDate}).`);
@@ -57,8 +58,16 @@ export default function FlightSearch({ tripId, destination, tripStartDate, tripE
       const data = await searchFlights({ origin, destination: dest, departure_date: date });
       setResults(Array.isArray(data) ? data : []);
       if (!data?.length) setError("No flights found for that route and date.");
-    } catch {
-      setError("Flight search failed. Please try again.");
+    } catch (err) {
+      const data = err?.response?.data;
+      const errors = data?.errors;
+      if (Array.isArray(errors) && errors.length > 0) {
+        setError(errors.map((e) => e.message.replace(/^Value error,\s*/i, "")).join(" "));
+      } else if (typeof data?.detail === "string" && data.detail !== "Validation error") {
+        setError(data.detail);
+      } else {
+        setError("Flight search failed. Please try again.");
+      }
     } finally {
       setLoading(false);
     }

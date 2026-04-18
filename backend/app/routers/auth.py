@@ -41,23 +41,31 @@ async def callback(code: str = Query(None), db: Session = Depends(get_db)):
     if not code:
         return RedirectResponse("/api/auth/google")
     # google sends user back here with a code, we swap it for tokens
-    async with httpx.AsyncClient() as client:
-        token_resp = await client.post(GOOGLE_TOKEN_URL, data={
-            "code": code,
-            "client_id": GOOGLE_CLIENT_ID,
-            "client_secret": GOOGLE_CLIENT_SECRET,
-            "redirect_uri": GOOGLE_REDIRECT_URI,
-            "grant_type": "authorization_code",
-        })
-        token_data = token_resp.json()
+    try:
+        async with httpx.AsyncClient() as client:
+            token_resp = await client.post(GOOGLE_TOKEN_URL, data={
+                "code": code,
+                "client_id": GOOGLE_CLIENT_ID,
+                "client_secret": GOOGLE_CLIENT_SECRET,
+                "redirect_uri": GOOGLE_REDIRECT_URI,
+                "grant_type": "authorization_code",
+            })
+            token_data = token_resp.json()
+            access_token_google = token_data.get("access_token")
+            if not access_token_google:
+                return RedirectResponse(f"{FRONTEND_URL}/login?error=auth_failed")
 
-        userinfo_resp = await client.get(
-            GOOGLE_USERINFO_URL,
-            headers={"Authorization": f"Bearer {token_data['access_token']}"},
-        )
-        userinfo = userinfo_resp.json()
+            userinfo_resp = await client.get(
+                GOOGLE_USERINFO_URL,
+                headers={"Authorization": f"Bearer {access_token_google}"},
+            )
+            userinfo = userinfo_resp.json()
+    except Exception:
+        return RedirectResponse(f"{FRONTEND_URL}/login?error=auth_failed")
 
-    google_id = userinfo["sub"]
+    google_id = userinfo.get("sub")
+    if not google_id:
+        return RedirectResponse(f"{FRONTEND_URL}/login?error=auth_failed")
     user = db.query(User).filter(User.google_id == google_id).first()
     is_new = user is None
 

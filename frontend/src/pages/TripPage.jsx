@@ -93,17 +93,17 @@ export default function TripPage() {
     setLoading(true);
     setError("");
 
-    Promise.all([getTrip(id), getTripFlights(id), getTripMembers(id), getTripItinerary(id)])
-      .then(([tripData, flightData, memberData, itineraryData]) => {
+    Promise.allSettled([getTrip(id), getTripFlights(id), getTripMembers(id), getTripItinerary(id)])
+      .then(([tripResult, flightResult, memberResult, itineraryResult]) => {
         if (!isActive) return;
-        setTrip(tripData);
-        setFlights(flightData);
-        setMembers(memberData);
-        setItineraryItems(itineraryData);
-      })
-      .catch((err) => {
-        if (!isActive) return;
-        setError(getErrorMessage(err, "Trip not found."));
+        if (tripResult.status === "rejected") {
+          setError(getErrorMessage(tripResult.reason, "Trip not found."));
+          return;
+        }
+        setTrip(tripResult.value);
+        if (flightResult.status === "fulfilled") setFlights(flightResult.value);
+        if (memberResult.status === "fulfilled") setMembers(memberResult.value);
+        if (itineraryResult.status === "fulfilled") setItineraryItems(itineraryResult.value);
       })
       .finally(() => {
         if (isActive) setLoading(false);
