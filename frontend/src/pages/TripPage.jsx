@@ -136,8 +136,12 @@ export default function TripPage() {
   };
 
   const refreshItinerary = async () => {
-    const data = await getTripItinerary(id);
-    setItineraryItems(data);
+    try {
+      const data = await getTripItinerary(id);
+      setItineraryItems(data);
+    } catch {
+      //silent - polling recovers recovery
+    }
   };
 
   const resetItineraryForm = () => {
@@ -204,7 +208,9 @@ export default function TripPage() {
     try {
       const updated = await updateTripBanner(id, { banner_color: color, banner_image_url: null });
       setTrip(updated);
-    } catch {} finally {
+    } catch (err) {
+      setError("Unable to update banner.");
+    } finally {
       setSavingBanner(false);
     }
   };
@@ -218,7 +224,9 @@ export default function TripPage() {
       try {
         const updated = await updateTripBanner(id, { banner_image_url: ev.target.result });
         setTrip(updated);
-      } catch {} finally {
+      } catch (err) {
+        setError("Unable to update banner.");
+      } finally {
         setSavingBanner(false);
       }
     };
@@ -230,7 +238,9 @@ export default function TripPage() {
     try {
       const updated = await updateTripBanner(id, { banner_image_url: null });
       setTrip(updated);
-    } catch {} finally {
+    } catch (err) {
+      setError("Unable to update banner.");
+    } finally {
       setSavingBanner(false);
     }
   };
@@ -332,25 +342,33 @@ export default function TripPage() {
       setConfirmSoloNoVote(itemId);
       return;
     }
-    const item = itineraryItems.find((i) => i.id === itemId);
-    if (item?.user_vote === vote) {
-      await removeItineraryVote(id, itemId);
-    } else {
-      await voteOnItineraryItem(id, itemId, vote);
-    }
-    await refreshItinerary();
+    try {
+      const item = itineraryItems.find((i) => i.id === itemId);
+      if (item?.user_vote === vote) {
+        await removeItineraryVote(id, itemId);
+      } else {
+        await voteOnItineraryItem(id, itemId, vote);
+      }
+      await refreshItinerary();
+  } catch {
+    setItineraryError("Unable to cast vote. Please try again.");
   }
+  } ;
 
   const handleConfirmSoloNoVote = async (itemId) => {
     setConfirmSoloNoVote(null);
-    const item = itineraryItems.find((i) => i.id === itemId);
-    if (item?.user_vote === false) {
-      await removeItineraryVote(id, itemId);
-    } else {
-      await voteOnItineraryItem(id, itemId, false);
-    }
-    await refreshItinerary();
+    try {
+      const item = itineraryItems.find((i) => i.id === itemId);
+      if (item?.user_vote === false) {
+        await removeItineraryVote(id, itemId);
+      } else {
+        await voteOnItineraryItem(id, itemId, false);
+      }
+      await refreshItinerary();
+  } catch {
+    setItineraryError("Unable to cast vote. Please try again.");
   }
+}
 
   const FlightCard = ({ flight, canDelete }) => (
     <div className="flight-result-card">

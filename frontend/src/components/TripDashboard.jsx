@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getTrips, deleteTrip } from "../api/trips";
 
+const [fetchError, setFetchError] = useState("");
+
 export default function TripDashboard({ refreshTrigger, onNewTrip }) {
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -13,7 +15,10 @@ export default function TripDashboard({ refreshTrigger, onNewTrip }) {
     setLoading(true);
     getTrips()
       .then(setTrips)
-      .catch(() => setTrips([]))
+      .catch(() => {
+        setTrips([]);
+        setFetchError("Unable to load trips. Please refresh.");
+      })
       .finally(() => setLoading(false));
   }, [refreshTrigger]);
 
@@ -29,7 +34,9 @@ export default function TripDashboard({ refreshTrigger, onNewTrip }) {
     try {
       await deleteTrip(tripId);
       setTrips((prev) => prev.filter((t) => t.id !== tripId));
-    } catch {}
+    } catch (err) {
+      alert("Unable to delete trip. Please try again.")
+    }
     setConfirmDelete(null);
   };
 
@@ -38,6 +45,10 @@ export default function TripDashboard({ refreshTrigger, onNewTrip }) {
 
   if (loading) {
     return <p style={{ color: "var(--subtext)", padding: "40px 0" }}>Loading trips…</p>;
+  }
+
+  if (fetchError){
+    return <p style={{ color: "red", padding: "40x 0" }}>{fetchError}</p>;
   }
 
   if (trips.length === 0) {

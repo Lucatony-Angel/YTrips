@@ -39,6 +39,6 @@ def group_search_flights(body: GroupFlightSearchRequest):
         body.origins,
         body.destination,
         body.departure_date,
-        body.arrival_window,
+        body.arrival_window.model_dump(by_alias=True),
     )
     return results
