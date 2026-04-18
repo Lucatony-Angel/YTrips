@@ -34,6 +34,14 @@ export default function FlightSearch({ tripId, destination, tripStartDate, tripE
       setError("Please fill in origin, destination, and date.");
       return;
     }
+    const iataRegex = /^[A-Z]{3,4}$/;
+    if (!iataRegex.test(origin)) {
+      setError("Origin must be a 3-4 letter airport code (e.g. JFK).");
+      return;
+    }
+    if (!iataRegex.test(dest)) {
+      setError("Destination must be a 3-4 letter airport code (e.g. LAX).")
+    }
     if (tripStartDate && date < tripStartDate) {
       setError(`Flight date cannot be before the trip start (${tripStartDate}).`);
       return;

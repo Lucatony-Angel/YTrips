@@ -762,29 +762,33 @@ export default function TripPage() {
               {/* Members */}
               {activeTab === "members" && (
                 <div className="members-list mt-md">
-                  {sortedMembers.map((member) => {
-                    const isMe = member.user_id === user?.id;
-                    const initials = member.display_name
-                      ? member.display_name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()
-                      : "?";
-                    return (
-                      <div key={member.user_id} className="member-row">
-                        <div className="member-avatar">
-                          {member.avatar_url
-                            ? <img src={member.avatar_url} alt={member.display_name} />
-                            : <span>{initials}</span>
-                          }
-                        </div>
-                        <div className="member-info">
-                          <div className="member-info-top">
-                            <span className="member-info-name">{isMe ? "You" : member.display_name}</span>
-                            {member.role === "owner" && <span className="member-role-badge">Owner</span>}
+                  {sortedMembers.length === 0 ? (
+                    <p className="text-sub">No members found.</p>
+                  ) : (
+                    sortedMembers.map((member) => {
+                      const isMe = member.user_id === user?.id;
+                      const initials = member.display_name
+                        ? member.display_name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()
+                        : "?";
+                      return (
+                        <div key={member.user_id} className="member-row">
+                          <div className="member-avatar">
+                            {member.avatar_url
+                              ? <img src={member.avatar_url} alt={member.display_name} />
+                              : <span>{initials}</span>
+                            }
                           </div>
-                          <span className="member-info-sub">{member.display_name}</span>
+                          <div className="member-info">
+                            <div className="member-info-top">
+                              <span className="member-info-name">{isMe ? "You" : member.display_name}</span>
+                              {member.role === "owner" && <span className="member-role-badge">Owner</span>}
+                            </div>
+                            <span className="member-info-sub">{member.display_name}</span>
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })
+                  )}
                 </div>
               )}
             </div>
