@@ -9,7 +9,7 @@ from app.models.user import User
 from app.models.trip import Trip
 from app.models.trip_member import TripMember
 from app.models.flight import Flight
-from app.schemas.trip import TripCreate, TripBannerUpdate, TripResponse, TripMemberResponse, GroupWindowSave
+from app.schemas.trip import TripCreate, TripBannerUpdate, TripResponse, TripMemberResponse, GroupWindowSave, VoteCast, MemberHomeAirportUpdate
 from app.schemas.flight import FlightResponse
 from app.schemas.itinerary import ItineraryItemCreate, ItineraryItemUpdate, ItineraryItemResponse
 from app.models.itinerary_item import ItineraryItem
@@ -302,7 +302,7 @@ def get_trip_itinerary(
 def cast_vote(
     trip_id: int,
     item_id: int,
-    body: dict,
+    body: VoteCast,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -313,7 +313,7 @@ def cast_vote(
     if not member:
         raise HTTPException(status_code=403, detail="Not a member of this trip")
 
-    vote_value = body.get("vote")
+    vote_value = body.vote
     if vote_value is None:
         raise HTTPException(status_code=422, detail="vote is required")
 
@@ -432,7 +432,7 @@ def delete_itinerary_item(
 @router.patch("/{trip_id}/members/me/home-airport")
 def set_my_home_airport(
     trip_id: int,
-    body: dict,
+    body: MemberHomeAirportUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -443,11 +443,8 @@ def set_my_home_airport(
     if not member:
         raise HTTPException(status_code=403, detail="Not a member of this trip")
 
-    airport = body.get("home_airport", "").strip().upper()
-    if not airport:
-        raise HTTPException(status_code=422, detail="home_airport is required")
-
-    member.home_airport = airport
+    member.home_airport = body.home_airport
+    
     db.commit()
     return {"home_airport": member.home_airport}
 

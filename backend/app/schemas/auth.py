@@ -1,5 +1,5 @@
-from pydantic import BaseModel
-
+from pydantic import BaseModel, field_validator
+import re
 
 class UserRead(BaseModel):
     id: int
@@ -13,3 +13,11 @@ class UserRead(BaseModel):
 
 class HomeAirportUpdate(BaseModel):
     home_airport: str
+
+    @field_validator("home_airport")
+    @classmethod
+    def validate_airport_code(cls, v: str) -> str:
+        code = v.strip().upper()
+        if not re.match(r"^[A-Z]{3,4}$", code):
+            raise ValueError("must be a 3 or 4 letter iATA/ICAO airport code")
+        return code

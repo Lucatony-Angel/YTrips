@@ -1,18 +1,24 @@
 from datetime import date, datetime
-from pydantic import BaseModel
-
+from pydantic import BaseModel, Field, field_validator, model_validator
+import re
 
 class GroupWindowSave(BaseModel):
     window_start: str
     window_end: str
-    total_cheapest_combined: float
-    currency: str
+    total_cheapest_combined: float = Field(..., ge=0)
+    currency: str = Field(..., min_length=3, max_length=3)
 
 
 class TripBannerUpdate(BaseModel):
     banner_color: str | None = None
     banner_image_url: str | None = None
 
+    @field_validator("banner_color")
+    @classmethod
+    def validate_hex_colors(cls, v: str | None) -> str | None:
+        if v is not None and not re.match(r"^#[0-9A-Fa-f]{6}$", v):
+            raise ValueError("must be a valid hex color like #2D3BE8")
+        return v
 
 class TripCreate(BaseModel):
     name: str
@@ -23,6 +29,22 @@ class TripCreate(BaseModel):
     arrival_window_end: datetime | None = None
     banner_color: str = "#2D3BE8"
     banner_image_url: str | None = None
+
+    @model_validator(mode="after")
+    def validate_dates(self):
+        if self.end_date < self.start_date:
+            raise ValueError("end_date must be on or after start_date")
+        if self.arrival_window_start and self.arrival_window_end:
+            if self.arrival_window_end <= self.arrival_window_start:
+                raise ValueError("arrival_window_end must be after arrival_window_start")
+        return self
+    
+    @field_validator("banner_color")
+    @classmethod
+    def validate_hex_colors(cls, v: str) -> str:
+        if not re.match(r"^#[0-9A-Fa-f]{6}$", v):
+            raise ValueError("must be a valid hex color like #2D3BE8")
+        return v
 
 class TripMemberResponse(BaseModel):
     user_id: int
