@@ -55,6 +55,52 @@ function isScheduledWithinTripDates(scheduledAt, trip) {
   return scheduledDate >= trip.start_date && scheduledDate <= trip.end_date;
 }
 
+function getDateKey(value) {
+  if (!value) return "unscheduled";
+  const key = String(value).slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(key) ? key : "unscheduled";
+}
+
+function formatDateKey(dateKey) {
+  if (dateKey === "unscheduled") return "Unscheduled";
+  return new Date(`${dateKey}T00:00:00`).toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function getDayOffset(startDateKey, dateKey) {
+  if (!startDateKey || dateKey === "unscheduled") return null;
+  const startParts = startDateKey.split("-").map(Number);
+  const dateParts = dateKey.split("-").map(Number);
+  if (startParts.length !== 3 || dateParts.length !== 3) return null;
+  const startUtc = Date.UTC(startParts[0], startParts[1] - 1, startParts[2]);
+  const dateUtc = Date.UTC(dateParts[0], dateParts[1] - 1, dateParts[2]);
+  const diff = Math.round((dateUtc - startUtc) / 86_400_000);
+  return diff >= 0 ? diff : null;
+}
+
+function getItineraryDayGroups(items) {
+  const groups = new Map();
+  for (const item of items) {
+    const dateKey = getDateKey(item.scheduled_at);
+    if (!groups.has(dateKey)) {
+      groups.set(dateKey, []);
+    }
+    groups.get(dateKey).push(item);
+  }
+
+  return Array.from(groups.entries())
+    .sort(([a], [b]) => {
+      if (a === "unscheduled") return 1;
+      if (b === "unscheduled") return -1;
+      return a.localeCompare(b);
+    })
+    .map(([dateKey, dayItems]) => ({ dateKey, items: dayItems }));
+}
+
 export default function TripPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -121,7 +167,9 @@ export default function TripPage() {
         ]);
         setItineraryItems(itineraryData);
         setMembers(memberData);
-      } catch {}
+      } catch {
+        // Polling should not surface transient refresh failures.
+      }
     }, 4000);
     return () => clearInterval(interval);
   }, [id]);
@@ -154,7 +202,7 @@ export default function TripPage() {
     setEditModalItem(item);
     setEditModalForm({
       title: item.title,
-      description: item.description,
+      description: item.description || "",
       scheduled_at: toDateTimeLocalValue(item.scheduled_at),
       location: item.location,
       category: item.category,
@@ -208,7 +256,7 @@ export default function TripPage() {
     try {
       const updated = await updateTripBanner(id, { banner_color: color, banner_image_url: null });
       setTrip(updated);
-    } catch (err) {
+    } catch {
       setError("Unable to update banner.");
     } finally {
       setSavingBanner(false);
@@ -224,7 +272,7 @@ export default function TripPage() {
       try {
         const updated = await updateTripBanner(id, { banner_image_url: ev.target.result });
         setTrip(updated);
-      } catch (err) {
+      } catch {
         setError("Unable to update banner.");
       } finally {
         setSavingBanner(false);
@@ -238,7 +286,7 @@ export default function TripPage() {
     try {
       const updated = await updateTripBanner(id, { banner_image_url: null });
       setTrip(updated);
-    } catch (err) {
+    } catch {
       setError("Unable to update banner.");
     } finally {
       setSavingBanner(false);
@@ -407,6 +455,77 @@ export default function TripPage() {
     : { background: "transparent" };
 
   const myFlights = flightByUser[user?.id] || [];
+  const itineraryDayGroups = getItineraryDayGroups(itineraryItems);
+
+  const renderItineraryCard = (item) => (
+    <div className="itinerary-card" key={item.id}>
+      <div className="itinerary-card-top">
+        <div style={{ flex: 1 }}>
+          <div className="itinerary-card-title-row">
+            <h4>{item.title}</h4>
+            <span className="trip-badge">{item.category}</span>
+          </div>
+          <div className="itinerary-meta">
+            <span>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              {formatDateTime(item.scheduled_at)}
+            </span>
+            <span>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+              {item.location}
+            </span>
+            <span>Added by {memberNameById[item.created_by_user_id] || "A trip member"}</span>
+          </div>
+          {item.description && <p className="itinerary-description">{item.description}</p>}
+          <div className="itinerary-vote-row">
+            <button
+              className={`btn btn-vote${item.user_vote === true ? " vote-active-yes" : ""}`}
+              onClick={() => handleVote(item.id, true)}
+            >
+              <span style={{ color: item.user_vote === true ? "#fff" : "#16a34a" }}>👍</span> {item.yes_votes}
+            </button>
+            {confirmSoloNoVote === item.id ? (
+              <div className="flight-delete-confirm">
+                <span>You're the only member — voting No will delete this item. Continue?</span>
+                <button className="btn btn-danger btn-xs" onClick={() => handleConfirmSoloNoVote(item.id)}>Yes, delete</button>
+                <button className="btn btn-outline btn-xs" onClick={() => setConfirmSoloNoVote(null)}>Cancel</button>
+              </div>
+            ) : (
+              <button
+                className={`btn btn-vote${item.user_vote === false ? " vote-active-no" : ""}`}
+                onClick={() => handleVote(item.id, false)}
+              >
+                <span style={{ color: item.user_vote === false ? "#fff" : "#dc2626" }}>👎</span> {item.no_votes}
+              </button>
+            )}
+            {(item.yes_votes + item.no_votes) > 0 && (
+              <span className="vote-approval">
+                {Math.round((item.yes_votes / (item.yes_votes + item.no_votes)) * 100)}% approval
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="itinerary-actions">
+          {confirmDeleteItinerary === item.id ? (
+            <div className="flight-delete-confirm">
+              <span>Remove?</span>
+              <button className="confirm-yes" onClick={() => handleDeleteItineraryItem(item.id)}>Delete</button>
+              <button className="confirm-no" onClick={() => setConfirmDeleteItinerary(null)}>Cancel</button>
+            </div>
+          ) : (
+            <>
+              <button type="button" className="btn btn-outline btn-sm" onClick={() => openEditModal(item)}>
+                Edit
+              </button>
+              <button type="button" className="btn btn-delete" onClick={() => setConfirmDeleteItinerary(item.id)}>
+                Delete
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="page">
@@ -658,7 +777,7 @@ export default function TripPage() {
                       </div>
                     </div>
                     <div className="form-group">
-                      <label htmlFor="itinerary-description">Description</label>
+                      <label htmlFor="itinerary-description">Description <span className="optional-label">Optional</span></label>
                       <textarea
                         id="itinerary-description"
                         name="description"
@@ -666,7 +785,6 @@ export default function TripPage() {
                         onChange={handleItineraryFieldChange}
                         placeholder="Add notes, meeting details, reservation info, or links."
                         rows={3}
-                        required
                       />
                     </div>
                     {itineraryError && <p className="error-text">{itineraryError}</p>}
@@ -680,75 +798,22 @@ export default function TripPage() {
 
                   {itineraryItems.length > 0 ? (
                     <div className="itinerary-list">
-                      {itineraryItems.map((item) => (
-                        <div className="itinerary-card" key={item.id}>
-                          <div className="itinerary-card-top">
-                            <div style={{ flex: 1 }}>
-                              <div className="itinerary-card-title-row">
-                                <h4>{item.title}</h4>
-                                <span className="trip-badge">{item.category}</span>
-                              </div>
-                              <div className="itinerary-meta">
-                                <span>
-                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                                  {formatDateTime(item.scheduled_at)}
-                                </span>
-                                <span>
-                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
-                                  {item.location}
-                                </span>
-                                <span>Added by {memberNameById[item.created_by_user_id] || "A trip member"}</span>
-                              </div>
-                              {item.description && <p className="itinerary-description">{item.description}</p>}
-                              <div className="itinerary-vote-row">
-                                <button
-                                  className={`btn btn-vote${item.user_vote === true ? " vote-active-yes" : ""}`}
-                                  onClick={() => handleVote(item.id, true)}
-                                >
-                                  <span style={{ color: item.user_vote === true ? "#fff" : "#16a34a" }}>👍</span> {item.yes_votes}
-                                </button>
-                                {confirmSoloNoVote === item.id ? (
-                                  <div className="flight-delete-confirm">
-                                    <span>You're the only member — voting No will delete this item. Continue?</span>
-                                    <button className="btn btn-danger btn-xs" onClick={() => handleConfirmSoloNoVote(item.id)}>Yes, delete</button>
-                                    <button className="btn btn-outline btn-xs" onClick={() => setConfirmSoloNoVote(null)}>Cancel</button>
-                                  </div>
-                                ) : (
-                                  <button
-                                    className={`btn btn-vote${item.user_vote === false ? " vote-active-no" : ""}`}
-                                    onClick={() => handleVote(item.id, false)}
-                                  >
-                                    <span style={{ color: item.user_vote === false ? "#fff" : "#dc2626" }}>👎</span> {item.no_votes}
-                                  </button>
-                                )}
-                                {(item.yes_votes + item.no_votes) > 0 && (
-                                  <span className="vote-approval">
-                                    {Math.round((item.yes_votes / (item.yes_votes + item.no_votes)) * 100)}% approval
-                                  </span>
-                                )}
-                              </div>
+                      {itineraryDayGroups.map((group) => {
+                        const dayOffset = getDayOffset(trip?.start_date, group.dateKey);
+                        return (
+                          <section className="itinerary-day" key={group.dateKey}>
+                            <div className="itinerary-day-header">
+                              <span>{dayOffset === null ? "Itinerary" : `Day ${dayOffset + 1}`}</span>
+                              <h4>{formatDateKey(group.dateKey)}</h4>
                             </div>
-                            <div className="itinerary-actions">
-                              {confirmDeleteItinerary === item.id ? (
-                                <div className="flight-delete-confirm">
-                                  <span>Remove?</span>
-                                  <button className="confirm-yes" onClick={() => handleDeleteItineraryItem(item.id)}>Delete</button>
-                                  <button className="confirm-no" onClick={() => setConfirmDeleteItinerary(null)}>Cancel</button>
-                                </div>
-                              ) : (
-                                <>
-                                  <button type="button" className="btn btn-outline btn-sm" onClick={() => openEditModal(item)}>
-                                    Edit
-                                  </button>
-                                  <button type="button" className="btn btn-delete" onClick={() => setConfirmDeleteItinerary(item.id)}>
-                                    Delete
-                                  </button>
-                                </>
-                              )}
+                            <div className="itinerary-day-items">
+                              {group.items.map((item) => (
+                                renderItineraryCard(item)
+                              ))}
                             </div>
-                          </div>
-                        </div>
-                      ))}
+                          </section>
+                        );
+                      })}
                     </div>
                   ) : (
                     <div className="itinerary-empty">
@@ -852,8 +917,8 @@ export default function TripPage() {
                 </div>
               </div>
               <div className="form-group">
-                <label>Description</label>
-                <textarea name="description" value={editModalForm.description} onChange={handleEditModalFieldChange} rows={3} required />
+                <label>Description <span className="optional-label">Optional</span></label>
+                <textarea name="description" value={editModalForm.description} onChange={handleEditModalFieldChange} rows={3} />
               </div>
               {editModalError && <p className="error-text">{editModalError}</p>}
               <div className="modal-actions">
