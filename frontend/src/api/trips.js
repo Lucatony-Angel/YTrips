@@ -74,3 +74,13 @@ export async function updateTripBanner(id, data) {
   const res = await api.patch(`/api/trips/${id}/banner`, data);
   return res.data;
 }
+
+export async function finalizeTrip(id) {
+  const res = await api.post(`/api/trips/${id}/finalize`);
+  return res.data;
+}
+
+export async function unfinalizeTrip(id) {
+  const res = await api.post(`/api/trips/${id}/unfinalize`);
+  return res.data;
+}

@@ -365,6 +365,10 @@ def create_itinerary_item(
     if not member:
         raise HTTPException(status_code=403, detail="Not a member of this trip")
 
+    trip = db.query(Trip).filter(Trip.id == trip_id).first()
+    if trip and trip.is_finalized and trip.created_by_user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Trip is finalized")
+
     item = ItineraryItem(
         trip_id=trip_id,
         created_by_user_id=current_user.id,
@@ -385,6 +389,10 @@ def update_itinerary_item(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    trip = db.query(Trip).filter(Trip.id == trip_id).first()
+    if trip and trip.is_finalized and trip.created_by_user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Trip is finalized")
+
     item = db.query(ItineraryItem).filter(
         ItineraryItem.id == item_id,
         ItineraryItem.trip_id == trip_id
@@ -411,6 +419,10 @@ def delete_itinerary_item(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    trip = db.query(Trip).filter(Trip.id == trip_id).first()
+    if trip and trip.is_finalized and trip.created_by_user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Trip is finalized")
+
     item = db.query(ItineraryItem).filter(
         ItineraryItem.id == item_id,
         ItineraryItem.trip_id == trip_id
@@ -425,6 +437,40 @@ def delete_itinerary_item(
     db.commit()
 
     return {"message": "Deleted"}
+
+
+@router.post("/{trip_id}/finalize", response_model=TripResponse)
+def finalize_trip(
+    trip_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    trip = db.query(Trip).filter(Trip.id == trip_id).first()
+    if not trip:
+        raise HTTPException(status_code=404, detail="Trip not found")
+    if trip.created_by_user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only the owner can finalize")
+    trip.is_finalized = True
+    db.commit()
+    db.refresh(trip)
+    return trip
+
+
+@router.post("/{trip_id}/unfinalize", response_model=TripResponse)
+def unfinalize_trip(
+    trip_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    trip = db.query(Trip).filter(Trip.id == trip_id).first()
+    if not trip:
+        raise HTTPException(status_code=404, detail="Trip not found")
+    if trip.created_by_user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only the owner can unlock")
+    trip.is_finalized = False
+    db.commit()
+    db.refresh(trip)
+    return trip
 
 
 # -------- GROUP FLIGHT SEARCH --------
