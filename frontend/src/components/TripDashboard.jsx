@@ -75,6 +75,17 @@ export default function TripDashboard({ refreshTrigger, onNewTrip }) {
         return (
           <div key={trip.id} className="trip-card" onClick={() => navigate(`/trips/${trip.id}`)}>
             <div className="trip-card-banner" style={bannerStyle}>
+              {trip.is_finalized ? (
+                <span className="trip-card-finalized-badge">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+                  Finalized
+                </span>
+              ) : (
+                <span className="trip-card-not-finalized-badge">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+                  Planning
+                </span>
+              )}
               {/* Delete button lives on the banner */}
               <button
                 className="trip-card-delete-btn"

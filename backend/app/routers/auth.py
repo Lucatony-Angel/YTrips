@@ -77,8 +77,10 @@ async def callback(code: str = Query(None), db: Session = Depends(get_db)):
             avatar_url=userinfo.get("picture"),
         )
         db.add(user)
-        db.commit()
-        db.refresh(user)
+    else:
+        user.avatar_url = userinfo.get("picture")
+    db.commit()
+    db.refresh(user)
 
     access_token = create_access_token(user.id)
 

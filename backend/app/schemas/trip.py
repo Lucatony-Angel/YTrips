@@ -79,6 +79,7 @@ class TripMemberResponse(BaseModel):
 class TripResponse(BaseModel):
     id: int
     name: str
+    created_by_user_id: int
     destination_name: str
     start_date: date
     end_date: date
@@ -93,6 +94,7 @@ class TripResponse(BaseModel):
     group_window_checked_at: datetime | None = None
     group_window_combined_price: float | None = None
     group_window_currency: str | None = None
+    is_finalized: bool = False
 
     class Config:
         from_attributes = True

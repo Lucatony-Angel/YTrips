@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { jsPDF } from "jspdf";
 import {
   createTripItineraryItem,
   deleteTripFlight,
@@ -12,7 +13,9 @@ import {
   updateTripBanner,
   updateTripItineraryItem,
   voteOnItineraryItem,
-  removeItineraryVote
+  finalizeTrip,
+  unfinalizeTrip,
+  removeItineraryVote,
 } from "../api/trips";
 import Navbar from "../components/Navbar";
 import FlightSearch from "../components/FlightSearch";
@@ -133,6 +136,11 @@ export default function TripPage() {
   const [confirmDeleteItinerary, setConfirmDeleteItinerary] = useState(null);
 
   const [confirmSoloNoVote, setConfirmSoloNoVote] = useState(null);
+  const [showExportConfirm, setShowExportConfirm] = useState(false);
+  const [showFinalizeConfirm, setShowFinalizeConfirm] = useState(false);
+  const [finalizing, setFinalizing] = useState(false);
+  const [showFinalizedModal, setShowFinalizedModal] = useState(false);
+  const [showTripPreview, setShowTripPreview] = useState(false);
 
   useEffect(() => {
     let isActive = true;
@@ -398,10 +406,10 @@ export default function TripPage() {
         await voteOnItineraryItem(id, itemId, vote);
       }
       await refreshItinerary();
-  } catch {
-    setItineraryError("Unable to cast vote. Please try again.");
-  }
-  } ;
+    } catch {
+      setItineraryError("Unable to cast vote. Please try again.");
+    }
+  };
 
   const handleConfirmSoloNoVote = async (itemId) => {
     setConfirmSoloNoVote(null);
@@ -413,10 +421,273 @@ export default function TripPage() {
         await voteOnItineraryItem(id, itemId, false);
       }
       await refreshItinerary();
-  } catch {
-    setItineraryError("Unable to cast vote. Please try again.");
-  }
-}
+    } catch {
+      setItineraryError("Unable to cast vote. Please try again.");
+    }
+  };
+
+
+  const handleFinalize = async () => {
+    setFinalizing(true);
+    try {
+      const updated = await finalizeTrip(id);
+      setTrip(updated);
+      setShowFinalizeConfirm(false);
+      setShowBannerEdit(false);
+      setShowFinalizedModal(true);
+    } catch (err) {
+      setError(getErrorMessage(err, "Unable to finalize trip."));
+    } finally {
+      setFinalizing(false);
+    }
+  };
+
+  const handleUnfinalize = async () => {
+    try {
+      const updated = await unfinalizeTrip(id);
+      setTrip(updated);
+    } catch (err) {
+      setError(getErrorMessage(err, "Unable to unlock trip."));
+    }
+  };
+
+  // Extracts first sentence for a clean summary line
+  const summarize = (text) => {
+    if (!text) return "";
+    const first = text.split(/[.!?]/)[0].trim();
+    return first.length > 120 ? first.slice(0, 117) + "..." : first;
+  };
+
+  const buildPDFDoc = () => {
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+    const margin = 52;
+    const contentW = pageW - margin * 2;
+    let y = 0;
+
+    // Parse trip banner color to RGB
+    const hexToRgb = (hex) => {
+      const h = hex.replace("#", "");
+      return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+    };
+    const [hr, hg, hb] = hexToRgb(trip.banner_color || "#2D3BE8");
+
+    const checkPage = (needed = 24) => {
+      if (y + needed > pageH - 56) { doc.addPage(); y = 52; }
+    };
+
+    const sectionHeader = (title) => {
+      checkPage(36);
+      y += 10;
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(hr, hg, hb);
+      doc.text(title.toUpperCase(), margin, y);
+      y += 5;
+      doc.setDrawColor(hr, hg, hb);
+      doc.setLineWidth(0.5);
+      doc.line(margin, y, margin + contentW, y);
+      doc.setLineWidth(0.2);
+      doc.setDrawColor(229, 231, 235);
+      y += 16;
+      doc.setTextColor(17, 24, 39);
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "normal");
+    };
+
+    // Header
+    if (trip.banner_image_url) {
+      try {
+        // Draw image stretched across the header area, then darken with a semi-transparent overlay
+        doc.addImage(trip.banner_image_url, 0, 0, pageW, 82);
+        doc.setFillColor(0, 0, 0);
+        doc.setGState(new doc.GState({ opacity: 0.45 }));
+        doc.rect(0, 0, pageW, 82, "F");
+        doc.setGState(new doc.GState({ opacity: 1 }));
+      } catch {
+        // Fallback to solid color if image fails
+        doc.setFillColor(hr, hg, hb);
+        doc.rect(0, 0, pageW, 82, "F");
+      }
+    } else {
+      doc.setFillColor(hr, hg, hb);
+      doc.rect(0, 0, pageW, 82, "F");
+    }
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(24);
+    doc.setFont("helvetica", "bold");
+    doc.text(trip.name, margin, 38);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    const meta = `${trip.destination_name}   |   ${formatDate(trip.start_date)} to ${formatDate(trip.end_date)}   |   ${members.length} member${members.length !== 1 ? "s" : ""}`;
+    doc.text(meta, margin, 58);
+    doc.setFontSize(9);
+    doc.setTextColor(200, 210, 255);
+    doc.text("Generated by YTrips", margin, 74);
+
+    y = 106;
+    doc.setTextColor(17, 24, 39);
+
+    // Members
+    sectionHeader("Members");
+    members.forEach((m) => {
+      checkPage(18);
+      const isMe = m.user_id === user?.id;
+      doc.setFont("helvetica", isMe ? "bold" : "normal");
+      doc.text(`${m.display_name}${isMe ? "  (You)" : ""}`, margin + 10, y);
+      y += 17;
+    });
+    doc.setFont("helvetica", "normal");
+
+    // Flights
+    sectionHeader("Flights");
+    if (flights.length === 0) {
+      doc.setTextColor(156, 163, 175);
+      doc.text("No flights have been added yet.", margin + 10, y);
+      doc.setTextColor(17, 24, 39);
+      y += 18;
+    } else {
+      const fbu = {};
+      for (const f of flights) { if (!fbu[f.user_id]) fbu[f.user_id] = []; fbu[f.user_id].push(f); }
+      members.forEach((m) => {
+        const mf = fbu[m.user_id] || [];
+        const name = m.user_id === user?.id ? `${m.display_name} (You)` : m.display_name;
+        checkPage(22);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(11);
+        doc.setTextColor(55, 65, 81);
+        doc.text(name, margin + 10, y);
+        y += 15;
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(17, 24, 39);
+        if (mf.length === 0) {
+          doc.setTextColor(156, 163, 175);
+          doc.text("No flight added.", margin + 20, y);
+          doc.setTextColor(17, 24, 39);
+          y += 15;
+        } else {
+          mf.forEach((f) => {
+            checkPage(50);
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(11);
+            doc.text(`Flight ${f.flight_number}  -  ${f.airline}`, margin + 20, y);
+            doc.setFont("helvetica", "normal");
+            y += 14;
+            doc.text(`${f.departure_airport} to ${f.arrival_airport}`, margin + 20, y);
+            y += 13;
+            doc.setTextColor(107, 114, 128);
+            doc.setFontSize(10);
+            doc.text(`Departs ${formatDateTime(f.departure_time)}   Arrives ${formatDateTime(f.arrival_time)}`, margin + 20, y);
+            doc.setFontSize(11);
+            doc.setTextColor(17, 24, 39);
+            y += 18;
+          });
+        }
+        y += 4;
+      });
+    }
+
+    // Itinerary
+    sectionHeader("Itinerary");
+    if (itineraryItems.length === 0) {
+      doc.setTextColor(156, 163, 175);
+      doc.text("No itinerary items have been added yet.", margin + 10, y);
+      y += 18;
+    } else {
+      const sorted = [...itineraryItems].sort((a, b) => new Date(a.scheduled_at) - new Date(b.scheduled_at));
+      const byDate = {};
+      sorted.forEach((item) => {
+        const date = new Date(item.scheduled_at).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+        if (!byDate[date]) byDate[date] = [];
+        byDate[date].push(item);
+      });
+
+      Object.entries(byDate).forEach(([date, items]) => {
+        checkPage(28);
+        doc.setFillColor(243, 244, 246);
+        doc.rect(margin, y - 11, contentW, 17, "F");
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(10);
+        doc.setTextColor(75, 85, 99);
+        doc.text(date, margin + 8, y);
+        doc.setFontSize(11);
+        doc.setTextColor(17, 24, 39);
+        y += 20;
+
+        items.forEach((item) => {
+          checkPage(52);
+          const timeStr = new Date(item.scheduled_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(11);
+          doc.setTextColor(17, 24, 39);
+          doc.text(`${timeStr}  -  ${item.title}`, margin + 10, y);
+          y += 14;
+          if (item.category) {
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(9);
+            doc.setTextColor(150, 155, 165);
+            doc.text(item.category.toUpperCase(), margin + 10, y);
+            y += 12;
+          }
+          doc.setFontSize(10);
+          doc.setTextColor(107, 114, 128);
+          doc.text(item.location, margin + 10, y);
+          y += 13;
+          if (item.description) {
+            const summary = summarize(item.description);
+            if (summary) {
+              const lines = doc.splitTextToSize(summary, contentW - 20);
+              doc.setTextColor(75, 85, 99);
+              lines.forEach((line) => { checkPage(13); doc.text(line, margin + 10, y); y += 13; });
+            }
+          }
+          doc.setTextColor(17, 24, 39);
+          y += 10;
+        });
+        y += 6;
+      });
+    }
+
+    // Footer on every page
+    const totalPages = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+      doc.setPage(i);
+      doc.setFillColor(249, 250, 251);
+      doc.rect(0, pageH - 36, pageW, 36, "F");
+      doc.setFontSize(9);
+      doc.setTextColor(156, 163, 175);
+      doc.text(`YTrips  |  ${trip.name}`, margin, pageH - 16);
+      doc.text(`Page ${i} of ${totalPages}`, pageW - margin - doc.getTextWidth(`Page ${i} of ${totalPages}`), pageH - 16);
+    }
+
+    return doc;
+  };
+
+  const doExportPDF = () => {
+    setShowExportConfirm(false);
+    const doc = buildPDFDoc();
+    doc.save(`YTRIPS - ${trip.name} Itinerary.pdf`);
+  };
+
+  const handleDownloadAndShare = async () => {
+    setShowFinalizedModal(false);
+    setShowExportConfirm(false);
+    const doc = buildPDFDoc();
+    const filename = `YTRIPS - ${trip.name} Itinerary.pdf`;
+    // Try sharing the PDF file directly — no download
+    try {
+      const blob = doc.output("blob");
+      const file = new File([blob], filename, { type: "application/pdf" });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: `YTRIPS - ${trip.name} Itinerary` });
+        return;
+      }
+    } catch {}
+    // Fallback: just download it
+    doc.save(filename);
+  };
+
 
   const FlightCard = ({ flight, canDelete }) => (
     <div className="flight-result-card">
@@ -455,6 +726,7 @@ export default function TripPage() {
     : { background: "transparent" };
 
   const myFlights = flightByUser[user?.id] || [];
+  const isOwner = trip && user && trip.created_by_user_id === user.id;
   const itineraryDayGroups = getItineraryDayGroups(itineraryItems);
 
   const renderItineraryCard = (item) => (
@@ -532,15 +804,26 @@ export default function TripPage() {
       <Navbar />
       <div className="trip-detail-page">
         {/* Full-width banner */}
-        <div className="trip-banner" style={bannerStyle}>
+        <div className="trip-banner" style={{ ...bannerStyle, alignItems: loading ? "flex-start" : undefined }}>
           <div className="trip-banner-inner">
-            <button className="btn btn-back-white" onClick={() => navigate("/")}>
-              ← Back to Dashboard
-            </button>
+            {!loading && (
+              <button className="btn btn-back-white" onClick={() => navigate("/")}>
+                ← Back to Dashboard
+              </button>
+            )}
             {!loading && !error && trip && (
               <div className="trip-banner-title">
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
                   <h1 style={{ flex: 1 }}>{trip.name}</h1>
+                  <button
+                    className="banner-edit-btn"
+                    onClick={() => setShowTripPreview(true)}
+                    title="Preview trip"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    Preview
+                  </button>
+                  {!trip.is_finalized && (
                   <button
                     className="banner-edit-btn"
                     onClick={() => setShowBannerEdit((v) => !v)}
@@ -549,8 +832,47 @@ export default function TripPage() {
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                     Edit banner
                   </button>
+                  )}
+                  {trip.is_finalized && (
+                  <button
+                    className="banner-edit-btn"
+                    onClick={() => setShowExportConfirm(true)}
+                    title="Download itinerary PDF"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Export PDF
+                  </button>
+                  )}
+                  {isOwner && (
+                    trip.is_finalized ? (
+                      <button
+                        className="banner-edit-btn banner-unlock-btn"
+                        onClick={handleUnfinalize}
+                        title="Unlock trip"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>
+                        Unlock
+                      </button>
+                    ) : (
+                      <button
+                        className="banner-edit-btn banner-finalize-btn"
+                        onClick={() => setShowFinalizeConfirm(true)}
+                        title="Finalize trip"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                        Finalize
+                      </button>
+                    )
+                  )}
                 </div>
-                <div className="trip-banner-meta">
+                {trip.is_finalized && (
+                  <div className="finalized-banner-badge" style={{ marginTop: 14, marginBottom: 6 }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
+                    Trip Finalized
+                    {!isOwner && <span style={{ opacity: 0.75, marginLeft: 8 }}>· Itinerary is locked</span>}
+                  </div>
+                )}
+                <div className="trip-banner-meta" style={{ marginTop: trip.is_finalized ? 0 : 14 }}>
                   <span>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
                     {trip.destination_name}
@@ -567,6 +889,17 @@ export default function TripPage() {
 
                 {showBannerEdit && (
                   <div className="banner-edit-panel">
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span className="banner-edit-label" style={{ marginBottom: 0 }}>Edit Banner</span>
+                      <button
+                        type="button"
+                        className="banner-panel-close"
+                        onClick={() => setShowBannerEdit(false)}
+                        title="Close"
+                      >
+                        ✕
+                      </button>
+                    </div>
                     <div className="banner-edit-section">
                       <span className="banner-edit-label">Colour</span>
                       <div className="color-picker-row">
@@ -689,10 +1022,10 @@ export default function TripPage() {
                   </div>
                   {myFlights.length > 0 ? (
                     <div className="flight-results">
-                      {myFlights.map((f) => <FlightCard key={f.id} flight={f} canDelete={true} />)}
+                      {myFlights.map((f) => <FlightCard key={f.id} flight={f} canDelete={!trip.is_finalized} />)}
                     </div>
                   ) : (
-                    <p className="text-sub">No flight added yet. Search and add your flight below!</p>
+                    <p className="text-sub">{trip.is_finalized ? "No flight was added." : "No flight added yet. Search and add your flight below!"}</p>
                   )}
                 </div>
               )}
@@ -725,6 +1058,13 @@ export default function TripPage() {
               {/* Itinerary */}
               {activeTab === "itinerary" && (
                 <div className="mt-md">
+                  {trip.is_finalized && (
+                    <div className="finalized-notice">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                      {isOwner ? "Trip is locked. Unlock to make changes." : "This itinerary has been finalized by the trip owner. Items are read-only."}
+                    </div>
+                  )}
+                  {!trip.is_finalized && (
                   <form className="itinerary-form" onSubmit={handleSubmitItinerary}>
                     <div className="form-row">
                       <div className="form-group">
@@ -795,6 +1135,7 @@ export default function TripPage() {
                       </button>
                     </div>
                   </form>
+                  )}
 
                   {itineraryItems.length > 0 ? (
                     <div className="itinerary-list">
@@ -839,7 +1180,7 @@ export default function TripPage() {
                         <div key={member.user_id} className="member-row">
                           <div className="member-avatar">
                             {member.avatar_url
-                              ? <img src={member.avatar_url} alt={member.display_name} />
+                              ? <img src={member.avatar_url} alt={member.display_name} referrerPolicy="no-referrer" />
                               : <span>{initials}</span>
                             }
                           </div>
@@ -859,22 +1200,31 @@ export default function TripPage() {
             </div>
 
             {/* Search & Add Flights */}
-            <div className="card">
-              <h3 className="mb-lg">Search &amp; Add Flights</h3>
-              <FlightSearch
-                tripId={parseInt(id, 10)}
-                destination={trip.destination_name}
-                tripStartDate={trip.start_date}
-                tripEndDate={trip.end_date}
-                tripArrivalWindow={
-                  trip.arrival_window_start
-                    ? { arrival_window_start: trip.arrival_window_start, arrival_window_end: trip.arrival_window_end }
-                    : null
-                }
-                onFlightAdded={refreshFlights}
-                myFlights={myFlights}
-              />
-            </div>
+            {trip.is_finalized ? (
+              <div className="card">
+                <div className="finalized-notice">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  Flight search is locked — trip has been finalized.
+                </div>
+              </div>
+            ) : (
+              <div className="card">
+                <h3 className="mb-lg">Search &amp; Add Flights</h3>
+                <FlightSearch
+                  tripId={parseInt(id, 10)}
+                  destination={trip.destination_name}
+                  tripStartDate={trip.start_date}
+                  tripEndDate={trip.end_date}
+                  tripArrivalWindow={
+                    trip.arrival_window_start
+                      ? { arrival_window_start: trip.arrival_window_start, arrival_window_end: trip.arrival_window_end }
+                      : null
+                  }
+                  onFlightAdded={refreshFlights}
+                  myFlights={myFlights}
+                />
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -928,6 +1278,227 @@ export default function TripPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+
+      {/* Finalize confirmation */}
+      {showFinalizeConfirm && (
+        <div className="modal-overlay" onClick={() => setShowFinalizeConfirm(false)}>
+          <div className="modal-box" style={{ maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Finalize Trip</h3>
+              <button className="modal-close" onClick={() => setShowFinalizeConfirm(false)}>&#x2715;</button>
+            </div>
+            <p style={{ color: "var(--subtext)", fontSize: 14, lineHeight: 1.6 }}>
+              Finalizing will lock the itinerary and banner for all members. You can unlock the trip at any time.
+            </p>
+            <div className="modal-actions">
+              <button className="btn btn-outline" onClick={() => setShowFinalizeConfirm(false)} disabled={finalizing}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleFinalize} disabled={finalizing}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
+                {finalizing ? "Finalizing…" : "Finalize Trip"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Post-finalize action modal */}
+      {showFinalizedModal && (
+        <div className="modal-overlay" onClick={() => setShowFinalizedModal(false)}>
+          <div className="modal-box" style={{ maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: 8, verticalAlign: "middle", color: "#16a34a" }}><polyline points="20 6 9 17 4 12"/></svg>
+                Trip Finalized!
+              </h3>
+              <button className="modal-close" onClick={() => setShowFinalizedModal(false)}>&#x2715;</button>
+            </div>
+            <p style={{ color: "var(--subtext)", fontSize: 14, lineHeight: 1.6, marginBottom: 20 }}>
+              The itinerary is now locked. Would you like to export a PDF summary to share with your group?
+            </p>
+            <div className="finalized-action-grid">
+              <button className="finalized-action-btn" onClick={() => setShowFinalizedModal(false)}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 8 12 12 14 14"/></svg>
+                <span>Later</span>
+                <small>I'll do this another time</small>
+              </button>
+              <button className="finalized-action-btn finalized-action-btn--primary" onClick={() => { setShowFinalizedModal(false); doExportPDF(); }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <span>Download PDF</span>
+                <small>Save itinerary to device</small>
+              </button>
+              <button className="finalized-action-btn finalized-action-btn--share" onClick={handleDownloadAndShare}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                <span>Share PDF</span>
+                <small>Send without saving</small>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Share copied toast */}
+      {/* Export PDF confirmation (from banner button) */}
+      {showExportConfirm && (
+        <div className="modal-overlay" onClick={() => setShowExportConfirm(false)}>
+          <div className="modal-box" style={{ maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Export Trip Summary</h3>
+              <button className="modal-close" onClick={() => setShowExportConfirm(false)}>&#x2715;</button>
+            </div>
+            <p style={{ color: "var(--subtext)", fontSize: 14, lineHeight: 1.6, marginBottom: 20 }}>
+              Generate a PDF with your trip details, member list, flights, and itinerary.
+            </p>
+            <div className="finalized-action-grid">
+              <button className="finalized-action-btn" onClick={() => setShowExportConfirm(false)}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                <span>Cancel</span>
+                <small>Go back</small>
+              </button>
+              <button className="finalized-action-btn finalized-action-btn--primary" onClick={doExportPDF}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <span>Download PDF</span>
+                <small>Save to device</small>
+              </button>
+              <button className="finalized-action-btn finalized-action-btn--share" onClick={() => { setShowExportConfirm(false); handleDownloadAndShare(); }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                <span>Share PDF</span>
+                <small>Send without saving</small>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Trip Preview overlay */}
+      {showTripPreview && (
+        <div className="trip-preview-overlay">
+          <div className="trip-preview-header">
+            <span className="trip-preview-title">Trip Preview</span>
+            <button className="trip-preview-close" onClick={() => setShowTripPreview(false)}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              Close
+            </button>
+          </div>
+          <div className="trip-preview-body">
+            {/* Hero */}
+            <div className="trip-preview-hero" style={bannerStyle}>
+              <div className="trip-preview-hero-inner">
+                <h1>{trip.name}</h1>
+                <div className="trip-preview-hero-meta">
+                  <span>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+                    {trip.destination_name}
+                  </span>
+                  <span>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                    {formatDate(trip.start_date)} → {formatDate(trip.end_date)}
+                  </span>
+                  <span>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    {members.length} {members.length === 1 ? "member" : "members"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="trip-preview-content">
+              {/* Members */}
+              <section className="trip-preview-section">
+                <h2 className="trip-preview-section-title">Members</h2>
+                <div className="trip-preview-members">
+                  {sortedMembers.map((m) => {
+                    const initials = m.display_name ? m.display_name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase() : "?";
+                    const isMe = m.user_id === user?.id;
+                    return (
+                      <div key={m.user_id} className="trip-preview-member">
+                        <div className="member-avatar">
+                          {m.avatar_url ? <img src={m.avatar_url} alt={m.display_name} referrerPolicy="no-referrer" /> : <span>{initials}</span>}
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: 14 }}>{isMe ? "You" : m.display_name}</div>
+                          {m.role === "owner" && <div style={{ fontSize: 12, color: "var(--subtext)" }}>Owner</div>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+
+              {/* Flights */}
+              <section className="trip-preview-section">
+                <h2 className="trip-preview-section-title">Flights</h2>
+                {sortedMembers.map((m) => {
+                  const isMe = m.user_id === user?.id;
+                  const mFlights = flightByUser[m.user_id] || [];
+                  return (
+                    <div key={m.user_id} className="trip-preview-flight-group">
+                      <div className="trip-preview-flight-name">
+                        {isMe ? "My Flight" : m.display_name}
+                        {isMe && <span className="trip-badge" style={{ marginLeft: 8 }}>You</span>}
+                      </div>
+                      {mFlights.length === 0 ? (
+                        <p style={{ fontSize: 13, color: "var(--subtext)", marginTop: 4 }}>No flight added.</p>
+                      ) : (
+                        mFlights.map((f) => (
+                          <div key={f.id} className="trip-preview-flight-card">
+                            <div style={{ fontWeight: 700, fontSize: 15 }}>Flight {f.flight_number} · {f.airline}</div>
+                            <div style={{ fontSize: 14, color: "var(--subtext)", marginTop: 2 }}>{f.departure_airport} → {f.arrival_airport}</div>
+                            <div style={{ fontSize: 13, color: "var(--subtext)", marginTop: 2 }}>{formatDateTime(f.departure_time)} → {formatDateTime(f.arrival_time)}</div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  );
+                })}
+              </section>
+
+              {/* Itinerary */}
+              <section className="trip-preview-section">
+                <h2 className="trip-preview-section-title">Itinerary</h2>
+                {itineraryItems.length === 0 ? (
+                  <p style={{ fontSize: 14, color: "var(--subtext)" }}>No itinerary items yet.</p>
+                ) : (() => {
+                  const sorted = [...itineraryItems].sort((a, b) => new Date(a.scheduled_at) - new Date(b.scheduled_at));
+                  const byDate = {};
+                  sorted.forEach((item) => {
+                    const d = new Date(item.scheduled_at).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+                    if (!byDate[d]) byDate[d] = [];
+                    byDate[d].push(item);
+                  });
+                  return Object.entries(byDate).map(([date, items]) => (
+                    <div key={date} className="trip-preview-day">
+                      <div className="trip-preview-day-header">{date}</div>
+                      {items.map((item) => (
+                        <div key={item.id} className="trip-preview-item">
+                          <div className="trip-preview-item-time">
+                            {new Date(item.scheduled_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                          </div>
+                          <div className="trip-preview-item-body">
+                            <div className="trip-preview-item-title">
+                              {item.title}
+                              <span className="trip-badge" style={{ marginLeft: 8, fontSize: 11 }}>{item.category}</span>
+                            </div>
+                            {item.location && <div className="trip-preview-item-meta">
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+                              {item.location}
+                            </div>}
+                            {item.description && <p className="trip-preview-item-desc">{item.description}</p>}
+                            <div className="trip-preview-item-votes">
+                              <span style={{ color: "#16a34a" }}>👍 {item.yes_votes}</span>
+                              <span style={{ color: "#dc2626", marginLeft: 10 }}>👎 {item.no_votes}</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ));
+                })()}
+              </section>
+            </div>
           </div>
         </div>
       )}
