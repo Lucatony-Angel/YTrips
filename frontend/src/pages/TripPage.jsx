@@ -1249,11 +1249,6 @@ export default function TripPage() {
                   destination={trip.destination_name}
                   tripStartDate={trip.start_date}
                   tripEndDate={trip.end_date}
-                  tripArrivalWindow={
-                    trip.arrival_window_start
-                      ? { arrival_window_start: trip.arrival_window_start, arrival_window_end: trip.arrival_window_end }
-                      : null
-                  }
                   onFlightAdded={refreshFlights}
                   myFlights={myFlights}
                 />

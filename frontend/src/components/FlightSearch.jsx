@@ -1,23 +1,23 @@
 import { useState } from "react";
 import { searchFlights, addFlight } from "../api/flights";
 import { useAuth } from "../context/AuthContext";
-import ArrivalWindowPicker from "./ArrivalWindowPicker";
-
-const isoHour = (iso) => (iso ? parseInt(iso.slice(11, 13), 10) : null);
-const fmtHour = (iso) => iso ? `${iso.slice(11, 16)}` : null;
 
 const STORAGE_KEY = (tripId, userId) => `flight-search-${tripId}-${userId}`;
 
-export default function FlightSearch({ tripId, destination, tripStartDate, tripEndDate, tripArrivalWindow, onFlightAdded, myFlights = [] }) {
+export default function FlightSearch({ tripId, destination, tripStartDate, tripEndDate, onFlightAdded, myFlights = [] }) {
   const { user } = useAuth();
   const saved = (() => { try { return JSON.parse(localStorage.getItem(STORAGE_KEY(tripId, user?.id))) || {}; } catch { return {}; } })();
 
   const [origin, setOrigin] = useState(saved.origin || "");
   const [dest, setDest] = useState(saved.dest || destination || "");
   const [date, setDate] = useState(saved.date || "");
+  const [directOnly, setDirectOnly] = useState(saved.directOnly ?? false);
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [page, setPage] = useState(0);
+
+  const PAGE_SIZE = 10;
 
   const persist = (field, value) => {
     try {
@@ -25,9 +25,6 @@ export default function FlightSearch({ tripId, destination, tripStartDate, tripE
       localStorage.setItem(STORAGE_KEY(tripId, user?.id), JSON.stringify({ ...current, [field]: value }));
     } catch {}
   };
-
-  const [window_, setWindow] = useState(tripArrivalWindow || null);
-  const [showWindowPicker, setShowWindowPicker] = useState(false);
 
   const handleSearch = async () => {
     if (!origin || !dest || !date) {
@@ -53,6 +50,7 @@ export default function FlightSearch({ tripId, destination, tripStartDate, tripE
     }
     setError("");
     setResults([]);
+    setPage(0);
     setLoading(true);
     try {
       const data = await searchFlights({ origin, destination: dest, departure_date: date });
@@ -95,17 +93,12 @@ export default function FlightSearch({ tripId, destination, tripStartDate, tripE
   const formatDateTime = (dt) =>
     dt ? new Date(dt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—";
 
-  const filteredResults = results.filter((flight) => {
-    if (!window_) return true;
-    const lastSeg = flight.segments?.[flight.segments.length - 1];
-    if (!lastSeg) return false;
-    const arrHour = isoHour(lastSeg.arriving_at);
-    const winStart = isoHour(window_.arrival_window_start);
-    const winEnd = isoHour(window_.arrival_window_end);
-    return arrHour >= winStart && arrHour <= winEnd;
-  });
-
+  const filteredResults = directOnly
+    ? results.filter((f) => (f.segments?.length ?? 0) === 1)
+    : results;
   const hiddenCount = results.length - filteredResults.length;
+  const totalPages = Math.ceil(filteredResults.length / PAGE_SIZE);
+  const pageResults = filteredResults.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
   return (
     <div className="flight-search">
@@ -144,93 +137,99 @@ export default function FlightSearch({ tripId, destination, tripStartDate, tripE
       </div>
 
       <div className="flight-window-row">
-        <span className="label-inline" style={{ marginBottom: 0 }}>Arrival Window</span>
-        {window_ ? (
-          <div className="window-summary flex-1">
-            <span>{fmtHour(window_.arrival_window_start)} – {fmtHour(window_.arrival_window_end)}</span>
-            <button type="button" className="btn btn-outline btn-xs" onClick={() => setShowWindowPicker(true)}>Edit</button>
-            <button type="button" className="btn-icon" onClick={() => setWindow(null)}>×</button>
-          </div>
-        ) : (
-          <button type="button" className="btn btn-outline btn-sm" onClick={() => setShowWindowPicker(true)}>
-            + Set Window
-          </button>
-        )}
+        <label className="pill-toggle">
+          <input
+            type="checkbox"
+            checked={directOnly}
+            onChange={(e) => { setDirectOnly(e.target.checked); persist("directOnly", e.target.checked); setPage(0); }}
+          />
+          <span className="pill-track"><span className="pill-thumb" /></span>
+          <span className="pill-label">Direct flights only</span>
+        </label>
       </div>
 
       {error && <p className="error-text mt-md">{error}</p>}
 
-      {results.length > 0 && (
-        <div className="flight-results">
-          {filteredResults.length === 0 ? (
-            <p className="text-sub">
-              No flights arrive within your window. <button className="btn-link" onClick={() => setWindow(null)}>Clear window</button> to see all {results.length} results.
-            </p>
-          ) : (
-            <>
-              {filteredResults.map((flight, i) => {
-                if (!flight.segments?.length) return null;
-                const segment = flight.segments[0];
-                const lastSeg = flight.segments[flight.segments.length - 1];
-                return (
-                  <div key={i} className="flight-result-card">
-                    <div className="flight-result-top">
-                      <div>
-                        <div className="flight-carrier">{flight.owner_name}</div>
-                        <div className="flight-route">
-                          {segment.origin} → {lastSeg.destination}
-                          {segment.flight_number && (
-                            <span className="flight-number-tag">
-                              · {segment.marketing_carrier} {segment.flight_number}
-                            </span>
-                          )}
-                          {flight.segments.length > 1 && (
-                            <span className="flight-stops">
-                              {" "}· {flight.segments.length - 1} stop{flight.segments.length > 2 ? "s" : ""}
-                            </span>
-                          )}
-                        </div>
-                        <div className="flight-times">
-                          {formatDateTime(segment.departing_at)} → {formatDateTime(lastSeg.arriving_at)}
-                        </div>
-                      </div>
-                      <div className="flight-result-right">
-                        <div className="flight-price">{flight.total_currency} {flight.total_amount}</div>
-                        {(() => {
-                          const isAdded = existingFlightNums.has(segment.flight_number);
-                          return (
-                            <button
-                              className={`btn btn-sm ${isAdded ? "btn-added" : "btn-primary"}`}
-                              onClick={() => !isAdded && handleAddFlight(flight, segment)}
-                              disabled={isAdded}
-                            >
-                              {isAdded ? "✓ Added" : "Add to Trip"}
-                            </button>
-                          );
-                        })()}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-              {hiddenCount > 0 && (
-                <p className="text-sub text-center">
-                  {hiddenCount} flight{hiddenCount > 1 ? "s" : ""} outside your window hidden.{" "}
-                  <button className="btn-link" onClick={() => setWindow(null)}>Show all</button>
-                </p>
-              )}
-            </>
-          )}
-        </div>
+      {results.length > 0 && filteredResults.length === 0 && (
+        <p className="text-sub mt-md">
+          No direct flights in these results.{" "}
+          <button className="btn-link" onClick={() => { setDirectOnly(false); persist("directOnly", false); setPage(0); }}>
+            Show all {results.length} flights
+          </button>
+        </p>
       )}
 
-      {showWindowPicker && (
-        <ArrivalWindowPicker
-          defaultDate={date || undefined}
-          existingWindow={window_}
-          onConfirm={(w) => setWindow(w)}
-          onClose={() => setShowWindowPicker(false)}
-        />
+      {filteredResults.length > 0 && (
+        <div className="flight-results">
+          {pageResults.map((flight, i) => {
+            if (!flight.segments?.length) return null;
+            const segment = flight.segments[0];
+            const lastSeg = flight.segments[flight.segments.length - 1];
+            return (
+              <div key={i} className="flight-result-card">
+                <div className="flight-result-top">
+                  <div>
+                    <div className="flight-carrier">{flight.owner_name}</div>
+                    <div className="flight-route">
+                      {segment.origin} → {lastSeg.destination}
+                      {segment.flight_number && (
+                        <span className="flight-number-tag">
+                          · {segment.marketing_carrier} {segment.flight_number}
+                        </span>
+                      )}
+                      {flight.segments.length > 1 && (
+                        <span className="flight-stops">
+                          {" "}· {flight.segments.length - 1} stop{flight.segments.length > 2 ? "s" : ""}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flight-times">
+                      {formatDateTime(segment.departing_at)} → {formatDateTime(lastSeg.arriving_at)}
+                    </div>
+                  </div>
+                  <div className="flight-result-right">
+                    <div className="flight-price">{flight.total_currency} {flight.total_amount}</div>
+                    {(() => {
+                      const isAdded = existingFlightNums.has(segment.flight_number);
+                      return (
+                        <button
+                          className={`btn btn-sm ${isAdded ? "btn-added" : "btn-primary"}`}
+                          onClick={() => !isAdded && handleAddFlight(flight, segment)}
+                          disabled={isAdded}
+                        >
+                          {isAdded ? "✓ Added" : "Add to Trip"}
+                        </button>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+
+          {totalPages > 1 && (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, marginTop: 8 }}>
+              <button
+                className="btn btn-outline btn-sm"
+                onClick={() => setPage((p) => p - 1)}
+                disabled={page === 0}
+              >
+                ← Prev
+              </button>
+              <span style={{ fontSize: 13, color: "var(--subtext)" }}>
+                Page {page + 1} of {totalPages} &nbsp;·&nbsp; {filteredResults.length} result{filteredResults.length !== 1 ? "s" : ""}
+                {directOnly && hiddenCount > 0 ? ` (${hiddenCount} with stops hidden)` : ""}
+              </span>
+              <button
+                className="btn btn-outline btn-sm"
+                onClick={() => setPage((p) => p + 1)}
+                disabled={page >= totalPages - 1}
+              >
+                Next →
+              </button>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
