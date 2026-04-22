@@ -49,8 +49,18 @@ def _search_duffel(origin, destination, departure_date, arrival_window=None):
 
 def basic_flight_search(origin, destination, departure_date):
     offers = _search_duffel(origin, destination, departure_date)
-    top_offers = offers[:5]
-    return [normalize_offer(o) for o in top_offers]
+    normalized = [normalize_offer(o) for o in offers]
+
+    # Duffel returns many offers for the same physical flight (different fare
+    # classes/booking codes). Deduplicate by itinerary — the ordered tuple of
+    # (flight_number, departing_at) across all segments — keeping the cheapest.
+    seen: dict[tuple, dict] = {}
+    for offer in normalized:
+        key = tuple((seg["flight_number"], seg["departing_at"]) for seg in offer["segments"])
+        if key not in seen or float(offer["total_amount"]) < float(seen[key]["total_amount"]):
+            seen[key] = offer
+
+    return list(seen.values())[:100]
 
 
 def group_flight_search(origins, destination, departure_date, arrival_window):
