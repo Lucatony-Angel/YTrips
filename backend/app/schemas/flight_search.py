@@ -31,6 +31,7 @@ class FlightSearchRequest(BaseModel):
     origin: str = Field(..., min_length=3, max_length=4)
     destination: str = Field(..., min_length=3, max_length=4)
     departure_date: str  # "YYYY-MM-DD"
+    direct_only: bool = False
 
     @field_validator("origin", "destination")
     @classmethod

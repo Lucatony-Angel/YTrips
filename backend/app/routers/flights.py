@@ -19,6 +19,7 @@ def search_flights(body: FlightSearchRequest):
         body.origin,
         body.destination,
         body.departure_date,
+        direct_only=body.direct_only,
     )
     if offers is None:
         raise HTTPException(status_code=502, detail="Flight search failed")

@@ -18,13 +18,16 @@ def create_trip(db: Session, trip_data: TripCreate, user_id: int):
         created_by_user_id=user_id
     )
 
+    db.add(trip)
+    db.flush()  # writes the trip row and populates trip.id without committing
+    assert trip.id is not None, "trip.id was not populated after flush — check trips.id has a SERIAL/IDENTITY default"
+
     membership = TripMember(
         trip_id=trip.id,
         user_id=user_id,
         role="owner"
     )
 
-    db.add(trip)
     db.add(membership)
     db.commit()
     db.refresh(trip)

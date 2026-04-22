@@ -22,7 +22,7 @@ def _get_headers():
     }
 
 
-def _search_duffel(origin, destination, departure_date, arrival_window=None):
+def _search_duffel(origin, destination, departure_date, arrival_window=None, direct_only=False):
     """raw duffel search, returns list of raw offers"""
     slice_data = {
         "origin": origin,
@@ -36,6 +36,7 @@ def _search_duffel(origin, destination, departure_date, arrival_window=None):
         "data": {
             "slices": [slice_data],
             "passengers": [{"type": "adult"}],
+            **({"max_connections": 0} if direct_only else {}),
         }
     }
 
@@ -47,9 +48,12 @@ def _search_duffel(origin, destination, departure_date, arrival_window=None):
     return response.json()["data"].get("offers", [])
 
 
-def basic_flight_search(origin, destination, departure_date):
-    offers = _search_duffel(origin, destination, departure_date)
+def basic_flight_search(origin, destination, departure_date, direct_only=False):
+    offers = _search_duffel(origin, destination, departure_date, direct_only=direct_only)
     normalized = [normalize_offer(o) for o in offers]
+
+    if direct_only:
+        normalized = [o for o in normalized if len(o["segments"]) == 1]
 
     # Duffel returns many offers for the same physical flight (different fare
     # classes/booking codes). Deduplicate by itinerary — the ordered tuple of
@@ -60,7 +64,7 @@ def basic_flight_search(origin, destination, departure_date):
         if key not in seen or float(offer["total_amount"]) < float(seen[key]["total_amount"]):
             seen[key] = offer
 
-    return list(seen.values())[:100]
+    return list(seen.values())[:200]
 
 
 def group_flight_search(origins, destination, departure_date, arrival_window):
