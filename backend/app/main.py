@@ -30,8 +30,8 @@ async def http_exception_handler(request: Request, exc: Exception):
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
 @app.exception_handler(Exception)
-async def unhandled_excpeption_handler(request: Request, exc: Exception):
-    return JSONResponse(status_code=500, content={"detail": "An enexpected error occurred"})
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    return JSONResponse(status_code=500, content={"detail": "An unexpected error occurred"})
 
 app.include_router(health.router)
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])

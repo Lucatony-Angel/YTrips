@@ -173,6 +173,10 @@ def delete_trip(
     if not trip:
         raise HTTPException(status_code=404, detail="Trip not found or you are not the owner")
 
+    item_ids = [r[0] for r in db.query(ItineraryItem.id).filter(ItineraryItem.trip_id == trip_id).all()]
+    if item_ids:
+        db.query(ItineraryVote).filter(ItineraryVote.item_id.in_(item_ids)).delete(synchronize_session=False)
+    db.query(ItineraryItem).filter(ItineraryItem.trip_id == trip_id).delete()
     db.query(Flight).filter(Flight.trip_id == trip_id).delete()
     db.query(TripMember).filter(TripMember.trip_id == trip_id).delete()
     db.delete(trip)
@@ -433,6 +437,7 @@ def delete_itinerary_item(
     if item.created_by_user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not your item")
 
+    db.query(ItineraryVote).filter(ItineraryVote.item_id == item_id).delete()
     db.delete(item)
     db.commit()
 

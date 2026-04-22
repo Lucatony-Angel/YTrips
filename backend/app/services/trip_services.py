@@ -18,18 +18,16 @@ def create_trip(db: Session, trip_data: TripCreate, user_id: int):
         created_by_user_id=user_id
     )
 
-    db.add(trip)
-    db.commit()
-    db.refresh(trip)
-
     membership = TripMember(
         trip_id=trip.id,
         user_id=user_id,
         role="owner"
     )
 
+    db.add(trip)
     db.add(membership)
     db.commit()
+    db.refresh(trip)
 
     return trip
 
