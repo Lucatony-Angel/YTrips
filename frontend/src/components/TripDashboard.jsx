@@ -39,8 +39,12 @@ export default function TripDashboard({ refreshTrigger, onNewTrip }) {
     setConfirmDelete(null);
   };
 
-  const formatDate = (d) =>
-    d ? new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—";
+  // Use the multi-arg Date constructor (always local time) — new Date("YYYY-MM-DD") parses as UTC and shifts the displayed date in non-UTC timezones.
+  const formatDate = (d) => {
+    if (!d) return "—";
+    const [y, m, day] = d.split("-").map(Number);
+    return new Date(y, m - 1, day).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  };
 
   if (loading) {
     return <p style={{ color: "var(--subtext)", padding: "40px 0" }}>Loading trips…</p>;

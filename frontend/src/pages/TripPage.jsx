@@ -21,6 +21,17 @@ import Navbar from "../components/Navbar";
 import FlightSearch from "../components/FlightSearch";
 import "../App.css";
 
+const ITINERARY_CATEGORIES = [
+  "Food & Dining",
+  "Activity",
+  "Transit",
+  "Accommodation",
+  "Sightseeing",
+  "Shopping",
+  "Entertainment",
+  "Other",
+];
+
 const PRESET_COLORS = [
   "#2D3BE8", "#7C3AED", "#DB2777", "#DC2626",
   "#D97706", "#16A34A", "#0891B2", "#374151",
@@ -301,8 +312,12 @@ export default function TripPage() {
     }
   };
 
-  const formatDate = (d) =>
-    d ? new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—";
+  // Use the multi-arg Date constructor (always local time) — new Date("YYYY-MM-DD") parses as UTC and shifts the displayed date in non-UTC timezones.
+  const formatDate = (d) => {
+    if (!d) return "—";
+    const [y, m, day] = d.split("-").map(Number);
+    return new Date(y, m - 1, day).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  };
 
   const formatDateTime = (dt) =>
     dt ? new Date(dt).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }) : "—";
@@ -588,14 +603,20 @@ export default function TripPage() {
       });
     }
 
-    // Itinerary
+    // Itinerary — only items with score (yes - no) >= 0
     sectionHeader("Itinerary");
-    if (itineraryItems.length === 0) {
+    const approvedItems = itineraryItems.filter((item) => (item.yes_votes - item.no_votes) >= 0);
+    if (approvedItems.length === 0) {
       doc.setTextColor(156, 163, 175);
-      doc.text("No itinerary items have been added yet.", margin + 10, y);
+      doc.text(
+        itineraryItems.length === 0
+          ? "No itinerary items have been added yet."
+          : "No itinerary items met the approval threshold (score ≥ 0).",
+        margin + 10, y
+      );
       y += 18;
     } else {
-      const sorted = [...itineraryItems].sort((a, b) => new Date(a.scheduled_at) - new Date(b.scheduled_at));
+      const sorted = [...approvedItems].sort((a, b) => new Date(a.scheduled_at) - new Date(b.scheduled_at));
       const byDate = {};
       sorted.forEach((item) => {
         const date = new Date(item.scheduled_at).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
@@ -618,6 +639,7 @@ export default function TripPage() {
         items.forEach((item) => {
           checkPage(52);
           const timeStr = new Date(item.scheduled_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+          const score = item.yes_votes - item.no_votes;
           doc.setFont("helvetica", "bold");
           doc.setFontSize(11);
           doc.setTextColor(17, 24, 39);
@@ -627,7 +649,15 @@ export default function TripPage() {
             doc.setFont("helvetica", "normal");
             doc.setFontSize(9);
             doc.setTextColor(150, 155, 165);
-            doc.text(item.category.toUpperCase(), margin + 10, y);
+            const scoreLabel = `  ·  Score: ${score > 0 ? "+" : ""}${score}  (👍 ${item.yes_votes}  👎 ${item.no_votes})`;
+            doc.text(item.category.toUpperCase() + scoreLabel, margin + 10, y);
+            y += 12;
+          } else {
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(9);
+            doc.setTextColor(150, 155, 165);
+            const scoreLabel = `Score: ${score > 0 ? "+" : ""}${score}  (👍 ${item.yes_votes}  👎 ${item.no_votes})`;
+            doc.text(scoreLabel, margin + 10, y);
             y += 12;
           }
           doc.setFontSize(10);
@@ -1080,14 +1110,18 @@ export default function TripPage() {
                       </div>
                       <div className="form-group">
                         <label htmlFor="itinerary-category">Category</label>
-                        <input
+                        <select
                           id="itinerary-category"
                           name="category"
                           value={itineraryForm.category}
                           onChange={handleItineraryFieldChange}
-                          placeholder="Food, activity, transit…"
                           required
-                        />
+                        >
+                          <option value="" disabled>Select a category</option>
+                          {ITINERARY_CATEGORIES.map((cat) => (
+                            <option key={cat} value={cat}>{cat}</option>
+                          ))}
+                        </select>
                       </div>
                     </div>
                     <div className="form-row">
@@ -1245,7 +1279,12 @@ export default function TripPage() {
                 </div>
                 <div className="form-group">
                   <label>Category</label>
-                  <input name="category" value={editModalForm.category} onChange={handleEditModalFieldChange} required />
+                  <select name="category" value={editModalForm.category} onChange={handleEditModalFieldChange} required>
+                    <option value="" disabled>Select a category</option>
+                    {ITINERARY_CATEGORIES.map((cat) => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
               <div className="form-row">

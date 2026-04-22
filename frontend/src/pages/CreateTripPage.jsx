@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { createTrip } from "../api/trips";
-import ArrivalWindowPicker from "../components/ArrivalWindowPicker";
+import DateRangePicker from "../components/DateRangePicker";
 import Navbar from "../components/Navbar";
 import "../App.css";
 
@@ -9,9 +9,6 @@ const PRESET_COLORS = [
   "#2D3BE8", "#7C3AED", "#DB2777", "#DC2626",
   "#D97706", "#16A34A", "#0891B2", "#374151",
 ];
-
-const fmtWindow = (iso) =>
-  iso ? new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }) : null;
 
 const getTodayIsoDate = () => {
   const now = new Date();
@@ -31,13 +28,10 @@ export default function CreateTripPage() {
     destination_name: "",
     start_date: "",
     end_date: "",
-    arrival_window_start: null,
-    arrival_window_end: null,
     banner_color: "#2D3BE8",
     banner_image_url: null,
   });
   const [bannerPreview, setBannerPreview] = useState(null);
-  const [showWindowPicker, setShowWindowPicker] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -98,8 +92,6 @@ export default function CreateTripPage() {
       setLoading(false);
     }
   };
-
-  const windowSet = form.arrival_window_start && form.arrival_window_end;
 
   const bannerStyle = bannerPreview
     ? { backgroundImage: `url(${bannerPreview})`, backgroundSize: "cover", backgroundPosition: "center" }
@@ -193,51 +185,15 @@ export default function CreateTripPage() {
                 />
               </div>
 
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Start Date *</label>
-                  <input
-                    type="date"
-                    lang="en-US"
-                    name="start_date"
-                    value={form.start_date}
-                    min={today}
-                    onChange={handleChange}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>End Date *</label>
-                  <input
-                    type="date"
-                    lang="en-US"
-                    name="end_date"
-                    value={form.end_date}
-                    min={form.start_date || today}
-                    onChange={handleChange}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="label-inline">
-                  Arrival Window <span className="label-hint">(optional)</span>
-                </label>
-                {windowSet ? (
-                  <div className="window-summary">
-                    <span>{fmtWindow(form.arrival_window_start)} – {fmtWindow(form.arrival_window_end)}</span>
-                    <button type="button" className="btn btn-outline btn-xs" onClick={() => setShowWindowPicker(true)}>Edit</button>
-                    <button type="button" className="btn-icon" onClick={() => setForm((f) => ({ ...f, arrival_window_start: null, arrival_window_end: null }))}>×</button>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    className="btn btn-outline btn-sm"
-                    disabled={!form.start_date || !form.end_date}
-                    onClick={() => setShowWindowPicker(true)}
-                  >
-                    + Set Arrival Window
-                  </button>
-                )}
+              <div className="form-group">
+                <label>Dates *</label>
+                <DateRangePicker
+                  startDate={form.start_date}
+                  endDate={form.end_date}
+                  onChange={({ start_date, end_date }) =>
+                    setForm((prev) => ({ ...prev, start_date, end_date }))
+                  }
+                />
               </div>
 
               {error && <p className="error-text">{error}</p>}
@@ -253,14 +209,6 @@ export default function CreateTripPage() {
         </div>
       </div>
 
-      {showWindowPicker && (
-        <ArrivalWindowPicker
-          tripStart={form.start_date}
-          tripEnd={form.end_date}
-          onConfirm={(w) => setForm((f) => ({ ...f, ...w }))}
-          onClose={() => setShowWindowPicker(false)}
-        />
-      )}
     </div>
   );
 }

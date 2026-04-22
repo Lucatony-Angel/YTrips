@@ -1266,6 +1266,11 @@ html.dark .finalized-action-btn--share {
 html.dark .finalized-action-btn--share:hover { background: #0a2918; }
 html.dark .finalized-action-btn--share small { color: #4ade80; }
 
+/* Date range picker — force two months side by side */
+.rdp-popover .rdp-months {
+  flex-wrap: nowrap;
+}
+
 /* Dark mode toggle button */
 .btn-theme-toggle {
   display: inline-flex;
