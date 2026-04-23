@@ -6,9 +6,11 @@ from app.db.database import get_db
 from app.auth import get_current_user
 from app.models.user import User
 from app.schemas.flight_search import FlightSearchRequest, FlightOfferRead, GroupFlightSearchRequest
-from app.schemas.flight import FlightCreate, FlightResponse
+from app.schemas.flight import FlightCreate, FlightResponse, FlightAssignBulkRequest
 from app.services.flight_search_services import basic_flight_search, group_flight_search
 from app.services.flight_services import add_flight
+from app.models.flight import Flight
+from app.models.trip_member import TripMember
 
 router = APIRouter()
 
@@ -33,6 +35,110 @@ def add_flight_endpoint(
     current_user: User = Depends(get_current_user),
 ):
     return add_flight(db, flight, current_user.id)
+
+
+@router.post("/add-to-all", response_model=List[FlightResponse])
+def add_flight_to_all(
+    flight: FlightCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    caller = db.query(TripMember).filter(
+        TripMember.trip_id == flight.trip_id,
+        TripMember.user_id == current_user.id,
+    ).first()
+    if not caller:
+        raise HTTPException(status_code=403, detail="Not a member of this trip")
+
+    member_ids = [
+        row.user_id for row in
+        db.query(TripMember).filter(TripMember.trip_id == flight.trip_id).all()
+    ]
+
+    existing = {
+        (f.user_id, f.flight_number) for f in
+        db.query(Flight).filter(
+            Flight.trip_id == flight.trip_id,
+            Flight.flight_number == flight.flight_number,
+        ).all()
+    }
+
+    created: List[Flight] = []
+    for uid in member_ids:
+        if (uid, flight.flight_number) in existing:
+            continue
+        row = Flight(
+            trip_id=flight.trip_id,
+            user_id=uid,
+            airline=flight.airline,
+            flight_number=flight.flight_number,
+            departure_airport=flight.departure_airport,
+            arrival_airport=flight.arrival_airport,
+            departure_time=flight.departure_time,
+            arrival_time=flight.arrival_time,
+        )
+        db.add(row)
+        created.append(row)
+
+    db.commit()
+    for row in created:
+        db.refresh(row)
+    return created
+
+
+@router.post("/assign-bulk", response_model=List[FlightResponse])
+def assign_flights_bulk(
+    body: FlightAssignBulkRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    caller = db.query(TripMember).filter(
+        TripMember.trip_id == body.trip_id,
+        TripMember.user_id == current_user.id,
+    ).first()
+    if not caller:
+        raise HTTPException(status_code=403, detail="Not a member of this trip")
+
+    member_ids = {
+        row.user_id for row in
+        db.query(TripMember).filter(TripMember.trip_id == body.trip_id).all()
+    }
+    for a in body.assignments:
+        if a.user_id not in member_ids:
+            raise HTTPException(
+                status_code=400,
+                detail=f"User {a.user_id} is not a member of this trip",
+            )
+
+    existing = {
+        (f.user_id, f.flight_number) for f in
+        db.query(Flight).filter(
+            Flight.trip_id == body.trip_id,
+            Flight.flight_number.in_([a.flight_number for a in body.assignments]),
+        ).all()
+    }
+
+    created: List[Flight] = []
+    for a in body.assignments:
+        if (a.user_id, a.flight_number) in existing:
+            continue
+        row = Flight(
+            trip_id=body.trip_id,
+            user_id=a.user_id,
+            airline=a.airline,
+            flight_number=a.flight_number,
+            departure_airport=a.departure_airport.upper(),
+            arrival_airport=a.arrival_airport.upper(),
+            departure_time=a.departure_time,
+            arrival_time=a.arrival_time,
+        )
+        db.add(row)
+        created.append(row)
+
+    db.commit()
+    for row in created:
+        db.refresh(row)
+    return created
 
 @router.post("/group-search", response_model=dict[str, List[FlightOfferRead]])
 def group_search_flights(body: GroupFlightSearchRequest):

@@ -93,6 +93,7 @@ class FlightSegmentRead(BaseModel):
     departing_at: str
     arriving_at: str
     marketing_carrier: str | None = None
+    marketing_carrier_iata_code: str | None = None
     flight_number: str | None = None
 
 class FlightOfferRead(BaseModel):

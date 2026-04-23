@@ -39,3 +39,18 @@ class FlightResponse(FlightCreate):
 
     class Config:
         from_attributes = True
+
+
+class FlightAssignmentItem(BaseModel):
+    user_id: int = Field(..., gt=0)
+    airline: str = Field(..., min_length=1, max_length=100)
+    flight_number: str = Field(..., min_length=2, max_length=10)
+    departure_airport: str = Field(..., min_length=3, max_length=4)
+    arrival_airport: str = Field(..., min_length=3, max_length=4)
+    departure_time: datetime
+    arrival_time: datetime
+
+
+class FlightAssignBulkRequest(BaseModel):
+    trip_id: int = Field(..., gt=0)
+    assignments: list[FlightAssignmentItem] = Field(..., min_length=1)

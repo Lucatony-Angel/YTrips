@@ -14,7 +14,8 @@ from app.schemas.flight import FlightResponse
 from app.schemas.itinerary import ItineraryItemCreate, ItineraryItemUpdate, ItineraryItemResponse
 from app.models.itinerary_item import ItineraryItem
 from app.services.trip_services import create_trip, get_user_trips
-from app.services.flight_search_services import find_group_windows
+from app.services.flight_search_services import find_group_windows, GroupSearchError
+from app.services.airport_registry import is_valid_airport_code
 from app.schemas.flight_search import GroupWindow
 from app.models.Itinerary_vote import ItineraryVote
 
@@ -485,7 +486,7 @@ def set_my_home_airport(
         raise HTTPException(status_code=403, detail="Not a member of this trip")
 
     member.home_airport = body.home_airport
-    
+
     db.commit()
     return {"home_airport": member.home_airport}
 
@@ -495,6 +496,7 @@ def group_search_for_trip(
     trip_id: int,
     departure_date: str,
     destination_iata: str,
+    origins: str | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -507,23 +509,42 @@ def group_search_for_trip(
     if not trip:
         raise HTTPException(status_code=404, detail="Trip not found")
 
-    rows = (
-        db.query(TripMember, User)
-        .join(User, TripMember.user_id == User.id)
-        .filter(TripMember.trip_id == trip_id)
-        .all()
-    )
+    dest = destination_iata.strip().upper()
+    if not is_valid_airport_code(dest):
+        raise HTTPException(status_code=400, detail=f"'{dest}' is not a recognized destination airport code")
 
-    origins = list({
-        tm.home_airport or u.home_airport
-        for tm, u in rows
-        if (tm.home_airport or u.home_airport)
-    })
+    if origins:
+        raw = [o.strip().upper() for o in origins.split(",") if o.strip()]
+        invalid = [code for code in raw if not is_valid_airport_code(code)]
+        if invalid:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unrecognized airport code(s): {', '.join(invalid)}",
+            )
+        origin_list = list(set(raw))
+    else:
+        rows = (
+            db.query(TripMember, User)
+            .join(User, TripMember.user_id == User.id)
+            .filter(TripMember.trip_id == trip_id)
+            .all()
+        )
+        origin_list = list({
+            tm.home_airport or u.home_airport
+            for tm, u in rows
+            if (tm.home_airport or u.home_airport)
+        })
 
-    if not origins:
-        raise HTTPException(status_code=400, detail="No members have a home airport set")
+    if not origin_list:
+        raise HTTPException(status_code=400, detail="No origins available for group search")
 
-    return find_group_windows(origins, destination_iata.upper(), departure_date)
+    try:
+        return find_group_windows(origin_list, dest, departure_date)
+    except GroupSearchError as err:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Flight provider call failed for origin(s): {', '.join(err.failed_origins)}. Please retry.",
+        )
 
 
 @router.patch("/{trip_id}/group-window", response_model=TripResponse)

@@ -1,10 +1,30 @@
 import requests
 import os
+from concurrent.futures import ThreadPoolExecutor
 from dotenv import load_dotenv
 
 load_dotenv()
 
 DUFFEL_URL = "https://api.duffel.com/air/offer_requests?return_offers=true"
+
+
+class DuffelOriginError(RuntimeError):
+    """Raised when a Duffel call for a specific origin fails with an HTTP error.
+
+    Distinct from 'zero flights found' — lets callers aggregate per-origin failures
+    instead of treating API outages as empty-result days.
+    """
+    def __init__(self, origin: str, status_code: int | None = None):
+        self.origin = origin
+        self.status_code = status_code
+        super().__init__(f"Duffel call failed for origin {origin} (status={status_code})")
+
+
+class GroupSearchError(RuntimeError):
+    """Aggregated per-origin failures from a group search run."""
+    def __init__(self, failed_origins: list[str]):
+        self.failed_origins = failed_origins
+        super().__init__(f"Duffel calls failed for: {', '.join(failed_origins)}")
 
 def _get_headers():
     env = os.getenv("ENVIRONMENT", "test")
@@ -22,8 +42,13 @@ def _get_headers():
     }
 
 
-def _search_duffel(origin, destination, departure_date, arrival_window=None, direct_only=False):
-    """raw duffel search, returns list of raw offers"""
+def _search_duffel(origin, destination, departure_date, arrival_window=None, direct_only=False, raise_on_error=False):
+    """raw duffel search, returns list of raw offers.
+
+    When raise_on_error=True, HTTP failures raise DuffelOriginError instead of
+    silently collapsing to []. Kept opt-in so existing legacy callers keep their
+    pre-existing tolerance to empty results.
+    """
     slice_data = {
         "origin": origin,
         "destination": destination,
@@ -40,9 +65,16 @@ def _search_duffel(origin, destination, departure_date, arrival_window=None, dir
         }
     }
 
-    response = requests.post(DUFFEL_URL, headers=_get_headers(), json=payload)
+    try:
+        response = requests.post(DUFFEL_URL, headers=_get_headers(), json=payload, timeout=15)
+    except requests.RequestException as exc:
+        if raise_on_error:
+            raise DuffelOriginError(origin) from exc
+        return []
 
     if response.status_code not in [200, 201]:
+        if raise_on_error:
+            raise DuffelOriginError(origin, status_code=response.status_code)
         return []
 
     return response.json()["data"].get("offers", [])
@@ -91,14 +123,14 @@ def normalize_offer(offer):
 
     for slice_ in offer.get("slices", []):
         for segment in slice_.get("segments", []):
+            carrier = segment.get("marketing_carrier") or {}
             all_segments.append({
                 "origin": segment['origin']['iata_code'],
                 "destination": segment['destination']['iata_code'],
                 "departing_at": segment["departing_at"],
                 "arriving_at": segment["arriving_at"],
-                "marketing_carrier": (
-                    segment.get("marketing_carrier", {})
-                ).get("name"),
+                "marketing_carrier": carrier.get("name"),
+                "marketing_carrier_iata_code": carrier.get("iata_code"),
                 "flight_number": segment.get("marketing_carrier_flight_number"),
             })
     return {
@@ -145,16 +177,33 @@ def find_group_windows(origins, destination, departure_date, window_hours=3, ste
     has at least one flight arriving. Returns windows ranked by cheapest
     combined price (one cheapest flight per origin).
 
-    Complexity: O(W * P * F) where W=windows (~36), P=people, F=flights per person.
+    Raises GroupSearchError if any origin's Duffel call fails (surfaces partial
+    outages instead of silently producing "no windows"). Windows whose best
+    offers span multiple currencies are skipped — the combined total would be
+    meaningless.
     """
-    # Step 1: fetch and normalize offers for each unique origin
-    flights_by_origin = {}
-    for origin in set(origins):
-        offers = _search_duffel(origin, destination, departure_date)
-        flights_by_origin[origin] = [normalize_offer(o) for o in offers]
+    unique_origins = list(set(origins))
+
+    # Step 1: fetch offers for each unique origin in parallel
+    flights_by_origin: dict[str, list] = {}
+    failed: list[str] = []
+
+    def _fetch(origin: str):
+        return origin, _search_duffel(origin, destination, departure_date, raise_on_error=True)
+
+    max_workers = min(len(unique_origins), 8) or 1
+    with ThreadPoolExecutor(max_workers=max_workers) as ex:
+        for future in [ex.submit(_fetch, o) for o in unique_origins]:
+            try:
+                origin, offers = future.result()
+                flights_by_origin[origin] = [normalize_offer(o) for o in offers]
+            except DuffelOriginError as err:
+                failed.append(err.origin)
+
+    if failed:
+        raise GroupSearchError(failed)
 
     # Step 2: pre-bucket each offer into its arrival hour slot for fast lookup
-    # bucket[origin] = list of (arrival_hour_float, offer)
     bucketed = {
         origin: [
             (h, o)
@@ -185,8 +234,12 @@ def find_group_windows(origins, destination, departure_date, window_hours=3, ste
         if not all_covered:
             continue
 
+        currencies = {o["total_currency"] for o in best_per_origin.values()}
+        if len(currencies) != 1:
+            # Mixed currencies — summing is meaningless without FX, skip this window
+            continue
+        currency = next(iter(currencies))
         total = sum(float(o["total_amount"]) for o in best_per_origin.values())
-        currency = next(iter(best_per_origin.values()))["total_currency"]
 
         results.append({
             "window_start": _fmt_hour(win_start),
