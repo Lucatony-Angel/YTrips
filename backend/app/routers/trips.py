@@ -222,16 +222,6 @@ def _run_vote_cleanup(db: Session, trip_id: int, item_id: int) -> None:
     scheduled_at = item.scheduled_at
 
 
-    item_votes = db.query(ItineraryVote).filter(ItineraryVote.item_id == item_id).all()
-    if member_count > 0 and len(item_votes) == member_count:
-        yes = sum(1 for v in item_votes if v.vote)
-        total = len(item_votes)
-        if total > 0 and yes / total < 0.5:
-            db.query(ItineraryVote).filter(ItineraryVote.item_id == item_id).delete()
-            db.delete(item)
-            db.commit()
-            item = None
-
     siblings = db.query(ItineraryItem).filter(
         ItineraryItem.trip_id == trip_id,
         ItineraryItem.scheduled_at == scheduled_at,
