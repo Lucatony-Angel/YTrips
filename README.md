@@ -48,7 +48,12 @@ March 25 - Deadline for MVP
 * Basic flight search for a single departure airport and destination 
 
 
-April 8 - Deadline for alpha version of app
+April 8 - Deadline for alpha version of app:
+* Group flight search: individual results per traveler filtered by the shared arrival window
+*Itinerary items organized into a day-by-day view
+*Polished trip view integrating members, itinerary, and flight search in one page
+*Input validation, error handling, and edge case coverage
+UI/UX refinements across all flows
 
 April 22 - Deadline for beta version of app
 
