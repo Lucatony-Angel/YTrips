@@ -173,6 +173,17 @@ export default function TripPage() {
   const [assigningWindowIdx, setAssigningWindowIdx] = useState(null);
   const [assignError, setAssignError] = useState("");
   const [assignSuccess, setAssignSuccess] = useState("");
+  const [excludedMemberIds, setExcludedMemberIds] = useState(() => new Set());
+
+  const isMemberIncluded = (userId) => !excludedMemberIds.has(userId);
+  const toggleMemberIncluded = (userId) => {
+    setExcludedMemberIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(userId)) next.delete(userId);
+      else next.add(userId);
+      return next;
+    });
+  };
 
   useEffect(() => {
     let isActive = true;
@@ -453,6 +464,7 @@ export default function TripPage() {
     setAssignSuccess("");
     const assignments = [];
     for (const member of members) {
+      if (!isMemberIncluded(member.user_id)) continue;
       const origin = getEffectiveHomeAirport(member);
       if (!origin) continue;
       const offer = win.best_offer_per_origin[origin];
@@ -509,17 +521,22 @@ export default function TripPage() {
       return;
     }
 
-    const perMember = members.map((m) => ({
-      member: m,
-      origin: getEffectiveHomeAirport(m),
-      overridden: Boolean(homeAirportOverrides[m.user_id]),
-    }));
+    const perMember = members
+      .filter((m) => isMemberIncluded(m.user_id))
+      .map((m) => ({
+        member: m,
+        origin: getEffectiveHomeAirport(m),
+        overridden: Boolean(homeAirportOverrides[m.user_id]),
+      }));
     const resolved = perMember.filter((r) => r.origin);
     const skipped = perMember.filter((r) => !r.origin).map((r) => r.member.display_name);
+    const excludedNames = members
+      .filter((m) => !isMemberIncluded(m.user_id))
+      .map((m) => (m.user_id === user?.id ? "You" : m.display_name));
     const origins = Array.from(new Set(resolved.map((r) => r.origin)));
 
     if (origins.length === 0) {
-      setGroupSearchError("At least one member needs a home airport.");
+      setGroupSearchError("Select at least one member with a home airport.");
       return;
     }
 
@@ -537,6 +554,7 @@ export default function TripPage() {
         origins,
         perMember: resolved,
         skipped,
+        excluded: excludedNames,
       });
     } catch (err) {
       setGroupSearchError(getErrorMessage(err, "Unable to run group search."));
@@ -1370,8 +1388,57 @@ export default function TripPage() {
                   <div className="card mt-md">
                     <h4 style={{ marginBottom: 12 }}>Find a group arrival window</h4>
                     <p className="text-sub" style={{ marginBottom: 12 }}>
-                      Uses each member's home airport above (including any "this search only" overrides). Picks the cheapest combined 3-hour arrival window where everyone can land.
+                      Uses each checked member's home airport above (including any "this search only" overrides). Picks the cheapest combined 3-hour arrival window where everyone can land.
                     </p>
+                    <div style={{ marginBottom: 16 }}>
+                      <div className="text-sub" style={{ marginBottom: 8, fontWeight: 600 }}>Include in search</div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                        {sortedMembers.map((m) => {
+                          const isMe = m.user_id === user?.id;
+                          const label = isMe ? "You" : m.display_name;
+                          const hasFlight = (flightByUser[m.user_id] || []).length > 0;
+                          const included = isMemberIncluded(m.user_id);
+                          return (
+                            <label
+                              key={m.user_id}
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 8,
+                                padding: "6px 12px",
+                                border: "1.5px solid var(--border)",
+                                borderRadius: 999,
+                                background: included ? "var(--bg-input)" : "transparent",
+                                cursor: "pointer",
+                                fontSize: 14,
+                                userSelect: "none",
+                                lineHeight: 1.2,
+                              }}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={included}
+                                onChange={() => toggleMemberIncluded(m.user_id)}
+                                style={{
+                                  width: 16,
+                                  height: 16,
+                                  padding: 0,
+                                  margin: 0,
+                                  flexShrink: 0,
+                                  cursor: "pointer",
+                                }}
+                              />
+                              <span style={{ whiteSpace: "nowrap" }}>{label}</span>
+                              {hasFlight && (
+                                <span className="text-sub" style={{ fontSize: 12, whiteSpace: "nowrap" }}>
+                                  · has flight
+                                </span>
+                              )}
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
                     <div className="form-row">
                       <div className="form-group">
                         <label htmlFor="group-search-date">Departure date</label>
@@ -1426,6 +1493,11 @@ export default function TripPage() {
                             Skipped (no home airport): {groupSearchSummary.skipped.join(", ")}
                           </p>
                         )}
+                        {groupSearchSummary.excluded.length > 0 && (
+                          <p className="text-sub mt-sm">
+                            Not included: {groupSearchSummary.excluded.join(", ")}
+                          </p>
+                        )}
                         <p className="text-sub" style={{ marginTop: 4, fontSize: 12 }}>
                           ★ marks per-session overrides
                         </p>
@@ -1441,6 +1513,7 @@ export default function TripPage() {
                         {assignSuccess && <p className="text-success">{assignSuccess}</p>}
                         {groupSearchResults.map((win, idx) => {
                           const membersForWindow = members
+                            .filter((m) => isMemberIncluded(m.user_id))
                             .map((m) => {
                               const origin = getEffectiveHomeAirport(m);
                               const offer = origin ? win.best_offer_per_origin[origin] : null;
@@ -1641,8 +1714,8 @@ export default function TripPage() {
               )}
             </div>
 
-            {/* Search & Add Flights — hidden on the group flight search tab */}
-            {activeTab !== "group" && (
+            {/* Search & Add Flights — only on the "My Flight" tab */}
+            {activeTab === "my" && (
               trip.is_finalized ? (
                 <div className="card">
                   <div className="finalized-notice">
