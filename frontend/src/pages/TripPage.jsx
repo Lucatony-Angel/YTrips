@@ -16,7 +16,10 @@ import {
   finalizeTrip,
   unfinalizeTrip,
   removeItineraryVote,
+  groupSearchFlights,
+  setMyHomeAirport,
 } from "../api/trips";
+import { assignFlightsBulk } from "../api/flights";
 import Navbar from "../components/Navbar";
 import FlightSearch from "../components/FlightSearch";
 import "../App.css";
@@ -152,6 +155,24 @@ export default function TripPage() {
   const [finalizing, setFinalizing] = useState(false);
   const [showFinalizedModal, setShowFinalizedModal] = useState(false);
   const [showTripPreview, setShowTripPreview] = useState(false);
+
+  const [editingHomeAirportUserId, setEditingHomeAirportUserId] = useState(null);
+  const [homeAirportDraft, setHomeAirportDraft] = useState("");
+  const [homeAirportError, setHomeAirportError] = useState("");
+  const [homeAirportOverrides, setHomeAirportOverrides] = useState({});
+  const [editingMyHome, setEditingMyHome] = useState(false);
+  const [myHomeDraft, setMyHomeDraft] = useState("");
+  const [myHomeSaving, setMyHomeSaving] = useState(false);
+  const [myHomeError, setMyHomeError] = useState("");
+  const [groupSearchDate, setGroupSearchDate] = useState("");
+  const [groupSearchDest, setGroupSearchDest] = useState("");
+  const [groupSearchLoading, setGroupSearchLoading] = useState(false);
+  const [groupSearchError, setGroupSearchError] = useState("");
+  const [groupSearchResults, setGroupSearchResults] = useState(null);
+  const [groupSearchSummary, setGroupSearchSummary] = useState(null);
+  const [assigningWindowIdx, setAssigningWindowIdx] = useState(null);
+  const [assignError, setAssignError] = useState("");
+  const [assignSuccess, setAssignSuccess] = useState("");
 
   useEffect(() => {
     let isActive = true;
@@ -366,6 +387,162 @@ export default function TripPage() {
   const handleItineraryFieldChange = (event) => {
     const { name, value } = event.target;
     setItineraryForm((current) => ({ ...current, [name]: value }));
+  };
+
+  const getEffectiveHomeAirport = (member) =>
+    homeAirportOverrides[member.user_id] ?? member.home_airport ?? null;
+
+  const startEditHomeAirport = (member) => {
+    setEditingHomeAirportUserId(member.user_id);
+    setHomeAirportDraft(getEffectiveHomeAirport(member) || "");
+    setHomeAirportError("");
+  };
+
+  const cancelEditHomeAirport = () => {
+    setEditingHomeAirportUserId(null);
+    setHomeAirportDraft("");
+    setHomeAirportError("");
+  };
+
+  const saveHomeAirport = (userId) => {
+    const code = homeAirportDraft.trim().toUpperCase();
+    if (code.length < 3 || code.length > 4) {
+      setHomeAirportError("Enter a valid 3- or 4-letter IATA code.");
+      return;
+    }
+    setHomeAirportOverrides((prev) => ({ ...prev, [userId]: code }));
+    cancelEditHomeAirport();
+  };
+
+  const myMember = members.find((m) => m.user_id === user?.id);
+
+  const startEditMyHome = () => {
+    setMyHomeDraft(myMember?.home_airport || "");
+    setMyHomeError("");
+    setEditingMyHome(true);
+  };
+
+  const cancelEditMyHome = () => {
+    setEditingMyHome(false);
+    setMyHomeDraft("");
+    setMyHomeError("");
+  };
+
+  const handleSaveMyHome = async () => {
+    const code = myHomeDraft.trim().toUpperCase();
+    if (code.length < 3 || code.length > 4) {
+      setMyHomeError("Enter a valid 3- or 4-letter IATA code.");
+      return;
+    }
+    setMyHomeSaving(true);
+    setMyHomeError("");
+    try {
+      await setMyHomeAirport(id, code);
+      const fresh = await getTripMembers(id);
+      setMembers(fresh);
+      cancelEditMyHome();
+    } catch (err) {
+      setMyHomeError(getErrorMessage(err, "Unable to save home airport."));
+    } finally {
+      setMyHomeSaving(false);
+    }
+  };
+
+  const handleAssignWindow = async (win, idx) => {
+    setAssignError("");
+    setAssignSuccess("");
+    const assignments = [];
+    for (const member of members) {
+      const origin = getEffectiveHomeAirport(member);
+      if (!origin) continue;
+      const offer = win.best_offer_per_origin[origin];
+      if (!offer || !offer.segments?.length) continue;
+      const first = offer.segments[0];
+      const last = offer.segments[offer.segments.length - 1];
+      const code = `${first.marketing_carrier_iata_code || ""}${first.flight_number || ""}`.trim()
+        || first.flight_number
+        || "UNKNOWN";
+      assignments.push({
+        user_id: member.user_id,
+        airline: offer.owner_name || "Unknown",
+        flight_number: code,
+        departure_airport: first.origin,
+        arrival_airport: last.destination,
+        departure_time: first.departing_at,
+        arrival_time: last.arriving_at,
+      });
+    }
+    if (assignments.length === 0) {
+      setAssignError("No members with resolvable origins for this window.");
+      return;
+    }
+    setAssigningWindowIdx(idx);
+    try {
+      const created = await assignFlightsBulk({
+        trip_id: parseInt(id, 10),
+        assignments,
+      });
+      await refreshFlights();
+      setAssignSuccess(
+        created.length === 0
+          ? "Everyone already had this flight."
+          : `Assigned flights to ${created.length} member${created.length === 1 ? "" : "s"}.`
+      );
+    } catch (err) {
+      setAssignError(getErrorMessage(err, "Unable to assign flights."));
+    } finally {
+      setAssigningWindowIdx(null);
+    }
+  };
+
+  const handleRunGroupSearch = async () => {
+    setGroupSearchError("");
+    setGroupSearchResults(null);
+    setGroupSearchSummary(null);
+    const dest = groupSearchDest.trim().toUpperCase();
+    if (!groupSearchDate) {
+      setGroupSearchError("Pick a departure date.");
+      return;
+    }
+    if (dest.length < 3 || dest.length > 4) {
+      setGroupSearchError("Enter a valid destination IATA code.");
+      return;
+    }
+
+    const perMember = members.map((m) => ({
+      member: m,
+      origin: getEffectiveHomeAirport(m),
+      overridden: Boolean(homeAirportOverrides[m.user_id]),
+    }));
+    const resolved = perMember.filter((r) => r.origin);
+    const skipped = perMember.filter((r) => !r.origin).map((r) => r.member.display_name);
+    const origins = Array.from(new Set(resolved.map((r) => r.origin)));
+
+    if (origins.length === 0) {
+      setGroupSearchError("At least one member needs a home airport.");
+      return;
+    }
+
+    setGroupSearchLoading(true);
+    try {
+      const data = await groupSearchFlights(id, {
+        departureDate: groupSearchDate,
+        destinationIata: dest,
+        origins,
+      });
+      setGroupSearchResults(data);
+      setGroupSearchSummary({
+        destination: dest,
+        date: groupSearchDate,
+        origins,
+        perMember: resolved,
+        skipped,
+      });
+    } catch (err) {
+      setGroupSearchError(getErrorMessage(err, "Unable to run group search."));
+    } finally {
+      setGroupSearchLoading(false);
+    }
   };
 
   const handleSubmitItinerary = async (event) => {
@@ -723,10 +900,14 @@ export default function TripPage() {
     <div className="flight-result-card">
       <div className="flight-result-top">
         <div>
-          <div className="flight-carrier">{flight.airline}</div>
+          <div className="flight-carrier">
+            {flight.airline}
+            {flight.flight_number && (
+              <span className="flight-number-tag"> · {flight.flight_number}</span>
+            )}
+          </div>
           <div className="flight-route">
             {flight.departure_airport} → {flight.arrival_airport}
-            <span className="flight-number-tag">· {flight.flight_number}</span>
           </div>
           <div className="flight-times">
             {formatDateTime(flight.departure_time)} → {formatDateTime(flight.arrival_time)}
@@ -1054,7 +1235,53 @@ export default function TripPage() {
                   <div className="member-flight-label" style={{ marginBottom: 8 }}>
                     <span className="member-flight-name">My Flight</span>
                     <span className="trip-badge">You</span>
+                    <span className="member-home-airport">
+                      {editingMyHome ? (
+                        <>
+                          <input
+                            type="text"
+                            value={myHomeDraft}
+                            maxLength={4}
+                            onChange={(e) => setMyHomeDraft(e.target.value.toUpperCase())}
+                            style={{ width: 70, padding: "4px 8px", fontSize: 13 }}
+                            autoFocus
+                          />
+                          <button
+                            type="button"
+                            className="btn btn-primary btn-xs"
+                            onClick={handleSaveMyHome}
+                            disabled={myHomeSaving}
+                          >
+                            {myHomeSaving ? "Saving…" : "Save"}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-outline btn-xs"
+                            onClick={cancelEditMyHome}
+                            disabled={myHomeSaving}
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <span className="trip-badge">
+                            {myMember?.home_airport ? `Home: ${myMember.home_airport}` : "No home airport"}
+                          </span>
+                          <button
+                            type="button"
+                            className="btn btn-outline btn-xs"
+                            onClick={startEditMyHome}
+                          >
+                            Change
+                          </button>
+                        </>
+                      )}
+                    </span>
                   </div>
+                  {editingMyHome && myHomeError && (
+                    <p className="error-text" style={{ marginTop: 4 }}>{myHomeError}</p>
+                  )}
                   {myFlights.length > 0 ? (
                     <div className="flight-results">
                       {myFlights.map((f) => <FlightCard key={f.id} flight={f} canDelete={!trip.is_finalized} />)}
@@ -1071,12 +1298,64 @@ export default function TripPage() {
                   {sortedMembers.map((member) => {
                     const isMe = member.user_id === user?.id;
                     const memberFlights = flightByUser[member.user_id] || [];
+                    const isEditingAirport = editingHomeAirportUserId === member.user_id;
                     return (
                       <div key={member.user_id}>
                         <div className="member-flight-label">
                           <span className="member-flight-name">{isMe ? "My Flight" : member.display_name}</span>
                           {isMe && <span className="trip-badge">You</span>}
+                          <span className="member-home-airport">
+                            {isEditingAirport ? (
+                              <>
+                                <input
+                                  type="text"
+                                  value={homeAirportDraft}
+                                  maxLength={4}
+                                  onChange={(e) => setHomeAirportDraft(e.target.value.toUpperCase())}
+                                  style={{ width: 70, padding: "4px 8px", fontSize: 13 }}
+                                  autoFocus
+                                />
+                                <button
+                                  type="button"
+                                  className="btn btn-primary btn-xs"
+                                  onClick={() => saveHomeAirport(member.user_id)}
+                                >
+                                  Use
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-outline btn-xs"
+                                  onClick={cancelEditHomeAirport}
+                                >
+                                  Cancel
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                {(() => {
+                                  const effective = getEffectiveHomeAirport(member);
+                                  const overridden = homeAirportOverrides[member.user_id];
+                                  return (
+                                    <span className="trip-badge">
+                                      {effective ? `Home: ${effective}` : "No home airport"}
+                                      {overridden && " (this search only)"}
+                                    </span>
+                                  );
+                                })()}
+                                <button
+                                  type="button"
+                                  className="btn btn-outline btn-xs"
+                                  onClick={() => startEditHomeAirport(member)}
+                                >
+                                  Edit
+                                </button>
+                              </>
+                            )}
+                          </span>
                         </div>
+                        {isEditingAirport && homeAirportError && (
+                          <p className="error-text" style={{ marginTop: 4 }}>{homeAirportError}</p>
+                        )}
                         {memberFlights.length > 0 ? (
                           <div className="flight-results mt-sm">
                             {memberFlights.map((f) => <FlightCard key={f.id} flight={f} canDelete={isMe} />)}
@@ -1087,6 +1366,130 @@ export default function TripPage() {
                       </div>
                     );
                   })}
+
+                  <div className="card mt-md">
+                    <h4 style={{ marginBottom: 12 }}>Find a group arrival window</h4>
+                    <p className="text-sub" style={{ marginBottom: 12 }}>
+                      Uses each member's home airport above (including any "this search only" overrides). Picks the cheapest combined 3-hour arrival window where everyone can land.
+                    </p>
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label htmlFor="group-search-date">Departure date</label>
+                        <input
+                          id="group-search-date"
+                          type="date"
+                          value={groupSearchDate}
+                          min={trip?.start_date || undefined}
+                          max={trip?.end_date || undefined}
+                          onChange={(e) => setGroupSearchDate(e.target.value)}
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label htmlFor="group-search-dest">Destination (IATA)</label>
+                        <input
+                          id="group-search-dest"
+                          type="text"
+                          maxLength={4}
+                          placeholder="e.g. CDG"
+                          value={groupSearchDest}
+                          onChange={(e) => setGroupSearchDest(e.target.value.toUpperCase())}
+                        />
+                      </div>
+                    </div>
+                    {groupSearchError && <p className="error-text" style={{ marginTop: 12 }}>{groupSearchError}</p>}
+                    <div style={{ marginTop: 16 }}>
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={handleRunGroupSearch}
+                        disabled={groupSearchLoading}
+                      >
+                        {groupSearchLoading ? "Searching…" : "Run group search"}
+                      </button>
+                    </div>
+
+                    {groupSearchSummary && (
+                      <div className="group-search-summary mt-md">
+                        <div>
+                          <strong>Searching:</strong> {groupSearchSummary.destination} · {groupSearchSummary.date}
+                        </div>
+                        <div className="group-search-origins mt-sm">
+                          {groupSearchSummary.perMember.map(({ member, origin, overridden }) => (
+                            <span key={member.user_id} className="trip-badge">
+                              {member.display_name}: {origin}
+                              {overridden && " ★"}
+                            </span>
+                          ))}
+                        </div>
+                        {groupSearchSummary.skipped.length > 0 && (
+                          <p className="text-sub mt-sm">
+                            Skipped (no home airport): {groupSearchSummary.skipped.join(", ")}
+                          </p>
+                        )}
+                        <p className="text-sub" style={{ marginTop: 4, fontSize: 12 }}>
+                          ★ marks per-session overrides
+                        </p>
+                      </div>
+                    )}
+
+                    {groupSearchResults && groupSearchResults.length === 0 && (
+                      <p className="text-sub mt-md">No arrival window covers every origin on that date.</p>
+                    )}
+                    {groupSearchResults && groupSearchResults.length > 0 && (
+                      <div className="mt-md gap-col">
+                        {assignError && <p className="error-text">{assignError}</p>}
+                        {assignSuccess && <p className="text-success">{assignSuccess}</p>}
+                        {groupSearchResults.map((win, idx) => {
+                          const membersForWindow = members
+                            .map((m) => {
+                              const origin = getEffectiveHomeAirport(m);
+                              const offer = origin ? win.best_offer_per_origin[origin] : null;
+                              return { member: m, origin, offer };
+                            });
+                          const anyAssignable = membersForWindow.some((r) => r.offer);
+                          return (
+                            <div key={idx} className="card" style={{ padding: 14 }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                                <strong>Arrival {win.window_start} – {win.window_end}</strong>
+                                <button
+                                  type="button"
+                                  className="btn btn-primary btn-sm"
+                                  onClick={() => handleAssignWindow(win, idx)}
+                                  disabled={!anyAssignable || assigningWindowIdx === idx || trip.is_finalized}
+                                  title={trip.is_finalized ? "Trip is locked" : "Create a flight row for each member using their origin"}
+                                >
+                                  {assigningWindowIdx === idx ? "Assigning…" : "Assign flights"}
+                                </button>
+                              </div>
+                              <div className="text-sub mt-sm">
+                                {membersForWindow.map(({ member, origin, offer }) => {
+                                  if (!offer) {
+                                    return (
+                                      <div key={member.user_id} style={{ marginTop: 4 }}>
+                                        <strong>{member.display_name}</strong>
+                                        {origin ? <> ({origin})</> : null}: no flight in this window
+                                      </div>
+                                    );
+                                  }
+                                  const codes = offer.segments
+                                    .map((s) => `${s.marketing_carrier_iata_code || ""}${s.flight_number || ""}`.trim())
+                                    .filter(Boolean)
+                                    .join(" → ");
+                                  return (
+                                    <div key={member.user_id} style={{ marginTop: 4 }}>
+                                      <strong>{member.display_name}</strong> ({origin}): {offer.total_amount} {offer.total_currency} · {offer.owner_name}
+                                      {codes && <> · {codes}</>}
+                                      {" "}· arrives {offer.segments[offer.segments.length - 1].arriving_at.slice(11, 16)}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -1238,26 +1641,28 @@ export default function TripPage() {
               )}
             </div>
 
-            {/* Search & Add Flights */}
-            {trip.is_finalized ? (
-              <div className="card">
-                <div className="finalized-notice">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                  Flight search is locked — trip has been finalized.
+            {/* Search & Add Flights — hidden on the group flight search tab */}
+            {activeTab !== "group" && (
+              trip.is_finalized ? (
+                <div className="card">
+                  <div className="finalized-notice">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    Flight search is locked — trip has been finalized.
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <div className="card">
-                <h3 className="mb-lg">Search &amp; Add Flights</h3>
-                <FlightSearch
-                  tripId={parseInt(id, 10)}
-                  destination={trip.destination_name}
-                  tripStartDate={trip.start_date}
-                  tripEndDate={trip.end_date}
-                  onFlightAdded={refreshFlights}
-                  myFlights={myFlights}
-                />
-              </div>
+              ) : (
+                <div className="card">
+                  <h3 className="mb-lg">Search &amp; Add Flights</h3>
+                  <FlightSearch
+                    tripId={parseInt(id, 10)}
+                    destination={trip.destination_name}
+                    tripStartDate={trip.start_date}
+                    tripEndDate={trip.end_date}
+                    onFlightAdded={refreshFlights}
+                    myFlights={myFlights}
+                  />
+                </div>
+              )
             )}
           </div>
         )}

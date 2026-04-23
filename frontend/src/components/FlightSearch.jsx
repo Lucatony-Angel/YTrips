@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { searchFlights, addFlight } from "../api/flights";
+import { searchFlights, addFlight, addFlightToAll } from "../api/flights";
 import { useAuth } from "../context/AuthContext";
 
 const STORAGE_KEY = (tripId, userId) => `flight-search-${tripId}-${userId}`;
@@ -71,22 +71,36 @@ export default function FlightSearch({ tripId, destination, tripStartDate, tripE
     }
   };
 
+  const formatFlightCode = (seg) =>
+    seg ? `${seg.marketing_carrier_iata_code || ""}${seg.flight_number || ""}`.trim() : "";
+
   const existingFlightNums = new Set(myFlights.map((f) => f.flight_number));
+
+  const buildFlightPayload = (flight, segment) => ({
+    trip_id: tripId,
+    airline: flight.owner_name,
+    flight_number: formatFlightCode(segment) || segment.flight_number,
+    departure_airport: segment.origin,
+    arrival_airport: segment.destination,
+    departure_time: segment.departing_at,
+    arrival_time: segment.arriving_at,
+  });
 
   const handleAddFlight = async (flight, segment) => {
     try {
-      await addFlight({
-        trip_id: tripId,
-        airline: flight.owner_name,
-        flight_number: segment.flight_number,
-        departure_airport: segment.origin,
-        arrival_airport: segment.destination,
-        departure_time: segment.departing_at,
-        arrival_time: segment.arriving_at,
-      });
+      await addFlight(buildFlightPayload(flight, segment));
       if (onFlightAdded) onFlightAdded();
     } catch {
       setError("Failed to add flight.");
+    }
+  };
+
+  const handleAddFlightToAll = async (flight, segment) => {
+    try {
+      await addFlightToAll(buildFlightPayload(flight, segment));
+      if (onFlightAdded) onFlightAdded();
+    } catch {
+      setError("Failed to add flight for everyone.");
     }
   };
 
@@ -169,14 +183,20 @@ export default function FlightSearch({ tripId, destination, tripStartDate, tripE
               <div key={i} className="flight-result-card">
                 <div className="flight-result-top">
                   <div>
-                    <div className="flight-carrier">{flight.owner_name}</div>
-                    <div className="flight-route">
-                      {segment.origin} → {lastSeg.destination}
-                      {segment.flight_number && (
+                    <div className="flight-carrier">
+                      {flight.owner_name}
+                      {flight.segments.some((s) => s.flight_number) && (
                         <span className="flight-number-tag">
-                          · {segment.marketing_carrier} {segment.flight_number}
+                          {" · "}
+                          {flight.segments
+                            .map((s) => formatFlightCode(s))
+                            .filter(Boolean)
+                            .join(" → ")}
                         </span>
                       )}
+                    </div>
+                    <div className="flight-route">
+                      {segment.origin} → {lastSeg.destination}
                       {flight.segments.length > 1 && (
                         <span className="flight-stops">
                           {" "}· {flight.segments.length - 1} stop{flight.segments.length > 2 ? "s" : ""}
@@ -190,15 +210,25 @@ export default function FlightSearch({ tripId, destination, tripStartDate, tripE
                   <div className="flight-result-right">
                     <div className="flight-price">{flight.total_currency} {flight.total_amount}</div>
                     {(() => {
-                      const isAdded = existingFlightNums.has(segment.flight_number);
+                      const composed = formatFlightCode(segment) || segment.flight_number;
+                      const isAdded = existingFlightNums.has(composed);
                       return (
-                        <button
-                          className={`btn btn-sm ${isAdded ? "btn-added" : "btn-primary"}`}
-                          onClick={() => !isAdded && handleAddFlight(flight, segment)}
-                          disabled={isAdded}
-                        >
-                          {isAdded ? "✓ Added" : "Add to Trip"}
-                        </button>
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                          <button
+                            className={`btn btn-sm ${isAdded ? "btn-added" : "btn-primary"}`}
+                            onClick={() => !isAdded && handleAddFlight(flight, segment)}
+                            disabled={isAdded}
+                          >
+                            {isAdded ? "✓ Added" : "Add to Trip"}
+                          </button>
+                          <button
+                            className="btn btn-sm btn-outline"
+                            onClick={() => handleAddFlightToAll(flight, segment)}
+                            title="Assign this flight to every trip member"
+                          >
+                            Add to all
+                          </button>
+                        </div>
                       );
                     })()}
                   </div>

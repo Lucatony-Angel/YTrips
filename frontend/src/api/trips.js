@@ -84,3 +84,22 @@ export async function unfinalizeTrip(id) {
   const res = await api.post(`/api/trips/${id}/unfinalize`);
   return res.data;
 }
+
+export async function setMyHomeAirport(tripId, homeAirport) {
+  const res = await api.patch(`/api/trips/${tripId}/members/me/home-airport`, {
+    home_airport: homeAirport,
+  });
+  return res.data;
+}
+
+export async function groupSearchFlights(tripId, { departureDate, destinationIata, origins }) {
+  const params = {
+    departure_date: departureDate,
+    destination_iata: destinationIata,
+  };
+  if (origins && origins.length) {
+    params.origins = origins.join(",");
+  }
+  const res = await api.get(`/api/trips/${tripId}/group-search`, { params });
+  return res.data;
+}
