@@ -204,6 +204,11 @@
   background: var(--bg-card);
 }
 
+.itinerary-card-unpopular {
+  border-color: #dc2626;
+  border-width: 2px;
+}
+
 .itinerary-card-top {
   display: flex;
   justify-content: space-between;
@@ -230,6 +235,18 @@
   margin-top: 10px;
   color: var(--subtext);
   font-size: 13px;
+}
+
+.itinerary-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  line-height: 1;
+}
+
+.itinerary-meta svg {
+  flex-shrink: 0;
+  display: block;
 }
 
 .itinerary-description {
@@ -358,7 +375,7 @@
   box-shadow: 0 1px 2px rgba(0,0,0,0.15);
 }
 .pill-toggle input:checked + .pill-track {
-  background: #2D3BE8;
+  background: #1e3a8a;
 }
 .pill-toggle input:checked + .pill-track .pill-thumb {
   transform: translateX(18px);

@@ -33,7 +33,7 @@ const ITINERARY_CATEGORIES = [
 ];
 
 const PRESET_COLORS = [
-  "#2D3BE8", "#7C3AED", "#DB2777", "#DC2626",
+  "#1e3a8a", "#7C3AED", "#DB2777", "#DC2626",
   "#D97706", "#16A34A", "#0891B2", "#374151",
 ];
 
@@ -486,7 +486,7 @@ export default function TripPage() {
       const h = hex.replace("#", "");
       return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
     };
-    const [hr, hg, hb] = hexToRgb(trip.banner_color || "#2D3BE8");
+    const [hr, hg, hb] = hexToRgb(trip.banner_color || "#1e3a8a");
 
     const checkPage = (needed = 24) => {
       if (y + needed > pageH - 56) { doc.addPage(); y = 52; }
@@ -649,14 +649,14 @@ export default function TripPage() {
             doc.setFont("helvetica", "normal");
             doc.setFontSize(9);
             doc.setTextColor(150, 155, 165);
-            const scoreLabel = `  ·  Score: ${score > 0 ? "+" : ""}${score}  (👍 ${item.yes_votes}  👎 ${item.no_votes})`;
+            const scoreLabel = `  ·  Score: ${score > 0 ? "+" : ""}${score}  (Yes ${item.yes_votes}  /  No ${item.no_votes})`;
             doc.text(item.category.toUpperCase() + scoreLabel, margin + 10, y);
             y += 12;
           } else {
             doc.setFont("helvetica", "normal");
             doc.setFontSize(9);
             doc.setTextColor(150, 155, 165);
-            const scoreLabel = `Score: ${score > 0 ? "+" : ""}${score}  (👍 ${item.yes_votes}  👎 ${item.no_votes})`;
+            const scoreLabel = `Score: ${score > 0 ? "+" : ""}${score}  (Yes ${item.yes_votes}  /  No ${item.no_votes})`;
             doc.text(scoreLabel, margin + 10, y);
             y += 12;
           }
@@ -752,15 +752,19 @@ export default function TripPage() {
   const bannerStyle = trip
     ? trip.banner_image_url
       ? { backgroundImage: `url(${trip.banner_image_url})`, backgroundSize: "cover", backgroundPosition: "center" }
-      : { background: trip.banner_color || "#2D3BE8" }
+      : { background: trip.banner_color || "#1e3a8a" }
     : { background: "transparent" };
 
   const myFlights = flightByUser[user?.id] || [];
   const isOwner = trip && user && trip.created_by_user_id === user.id;
   const itineraryDayGroups = getItineraryDayGroups(itineraryItems);
 
-  const renderItineraryCard = (item) => (
-    <div className="itinerary-card" key={item.id}>
+  const renderItineraryCard = (item) => {
+    const totalVotes = item.yes_votes + item.no_votes;
+    const allVoted = members.length > 0 && totalVotes === members.length;
+    const isUnpopular = allVoted && totalVotes > 0 && item.yes_votes / totalVotes < 0.5;
+    return (
+    <div className={`itinerary-card${isUnpopular ? " itinerary-card-unpopular" : ""}`} key={item.id}>
       <div className="itinerary-card-top">
         <div style={{ flex: 1 }}>
           <div className="itinerary-card-title-row">
@@ -827,7 +831,8 @@ export default function TripPage() {
         </div>
       </div>
     </div>
-  );
+    );
+  };
 
   return (
     <div className="page">
@@ -948,7 +953,7 @@ export default function TripPage() {
                           <input
                             type="color"
                             className="color-custom-input"
-                            value={trip.banner_color || "#2D3BE8"}
+                            value={trip.banner_color || "#1e3a8a"}
                             onChange={(e) => handleColorChange(e.target.value)}
                           />
                         </div>

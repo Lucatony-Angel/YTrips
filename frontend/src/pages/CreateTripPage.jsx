@@ -6,7 +6,7 @@ import Navbar from "../components/Navbar";
 import "../App.css";
 
 const PRESET_COLORS = [
-  "#2D3BE8", "#7C3AED", "#DB2777", "#DC2626",
+  "#1e3a8a", "#7C3AED", "#DB2777", "#DC2626",
   "#D97706", "#16A34A", "#0891B2", "#374151",
 ];
 
@@ -28,7 +28,7 @@ export default function CreateTripPage() {
     destination_name: "",
     start_date: "",
     end_date: "",
-    banner_color: "#2D3BE8",
+    banner_color: "#1e3a8a",
     banner_image_url: null,
   });
   const [bannerPreview, setBannerPreview] = useState(null);

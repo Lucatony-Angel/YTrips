@@ -120,7 +120,7 @@ export default function DateRangePicker({ startDate, endDate, onChange }) {
             borderRadius: 12,
             boxShadow: "0 8px 32px rgba(0,0,0,0.14)",
             padding: 16,
-            "--rdp-accent-color": "#2D3BE8",
+            "--rdp-accent-color": "#1e3a8a",
             "--rdp-accent-background-color": "#EEF0FD",
             "--rdp-range_middle-color": "#111827",
             "--rdp-day_button-border-radius": "8px",

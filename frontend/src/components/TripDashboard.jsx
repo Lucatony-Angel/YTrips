@@ -71,7 +71,7 @@ export default function TripDashboard({ refreshTrigger, onNewTrip }) {
       {trips.map((trip) => {
         const bannerStyle = trip.banner_image_url
           ? { backgroundImage: `url(${trip.banner_image_url})`, backgroundSize: "cover", backgroundPosition: "center" }
-          : { background: trip.banner_color || "#2D3BE8" };
+          : { background: trip.banner_color || "#1e3a8a" };
 
         const shortCode = trip.invite_code ? trip.invite_code.slice(0, 18) + "..." : "";
         const isPendingDelete = confirmDelete === trip.id;
