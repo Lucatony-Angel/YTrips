@@ -110,29 +110,33 @@ def assign_flights_bulk(
                 detail=f"User {a.user_id} is not a member of this trip",
             )
 
-    existing = {
-        (f.user_id, f.flight_number) for f in
+    user_ids = {a.user_id for a in body.assignments}
+    existing_routes = {
+        (f.user_id, f.departure_airport, f.arrival_airport) for f in
         db.query(Flight).filter(
             Flight.trip_id == body.trip_id,
-            Flight.flight_number.in_([a.flight_number for a in body.assignments]),
+            Flight.user_id.in_(user_ids),
         ).all()
     }
 
     created: List[Flight] = []
     for a in body.assignments:
-        if (a.user_id, a.flight_number) in existing:
+        dep = a.departure_airport.upper()
+        arr = a.arrival_airport.upper()
+        if (a.user_id, dep, arr) in existing_routes:
             continue
         row = Flight(
             trip_id=body.trip_id,
             user_id=a.user_id,
             airline=a.airline,
             flight_number=a.flight_number,
-            departure_airport=a.departure_airport.upper(),
-            arrival_airport=a.arrival_airport.upper(),
+            departure_airport=dep,
+            arrival_airport=arr,
             departure_time=a.departure_time,
             arrival_time=a.arrival_time,
         )
         db.add(row)
+        existing_routes.add((a.user_id, dep, arr))
         created.append(row)
 
     db.commit()
