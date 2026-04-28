@@ -103,3 +103,15 @@ export async function groupSearchFlights(tripId, { departureDate, destinationIat
   const res = await api.get(`/api/trips/${tripId}/group-search`, { params });
   return res.data;
 }
+
+export async function groupArrivalsSearch(tripId, { arrivalDate, destinationIata, origins, windowHours, directOnly }) {
+  const params = {
+    arrival_date: arrivalDate,
+    destination_iata: destinationIata,
+  };
+  if (origins && origins.length) params.origins = origins.join(",");
+  if (windowHours != null) params.window_hours = windowHours;
+  if (directOnly) params.direct_only = true;
+  const res = await api.get(`/api/trips/${tripId}/group-arrivals`, { params });
+  return res.data;
+}

@@ -16,7 +16,7 @@ import {
   finalizeTrip,
   unfinalizeTrip,
   removeItineraryVote,
-  groupSearchFlights,
+  groupArrivalsSearch,
   setMyHomeAirport,
 } from "../api/trips";
 import { assignFlightsBulk } from "../api/flights";
@@ -70,6 +70,11 @@ function isScheduledWithinTripDates(scheduledAt, trip) {
   if (!scheduledAt || !trip?.start_date || !trip?.end_date) return true;
   const scheduledDate = scheduledAt.slice(0, 10);
   return scheduledDate >= trip.start_date && scheduledDate <= trip.end_date;
+}
+
+function formatHm(iso) {
+  if (!iso || typeof iso !== "string" || iso.length < 16) return iso || "";
+  return iso.slice(11, 16);
 }
 
 function getDateKey(value) {
@@ -542,12 +547,12 @@ export default function TripPage() {
 
     setGroupSearchLoading(true);
     try {
-      const data = await groupSearchFlights(id, {
-        departureDate: groupSearchDate,
+      const data = await groupArrivalsSearch(id, {
+        arrivalDate: groupSearchDate,
         destinationIata: dest,
         origins,
       });
-      setGroupSearchResults(data);
+      setGroupSearchResults(data.windows || []);
       setGroupSearchSummary({
         destination: dest,
         date: groupSearchDate,
@@ -555,6 +560,8 @@ export default function TripPage() {
         perMember: resolved,
         skipped,
         excluded: excludedNames,
+        skippedMixedCurrency: data.skipped_mixed_currency_count || 0,
+        infeasibleOrigins: data.infeasible_origins || [],
       });
     } catch (err) {
       setGroupSearchError(getErrorMessage(err, "Unable to run group search."));
@@ -1441,7 +1448,7 @@ export default function TripPage() {
                     </div>
                     <div className="form-row">
                       <div className="form-group">
-                        <label htmlFor="group-search-date">Departure date</label>
+                        <label htmlFor="group-search-date">Arrival date</label>
                         <input
                           id="group-search-date"
                           type="date"
@@ -1498,8 +1505,18 @@ export default function TripPage() {
                             Not included: {groupSearchSummary.excluded.join(", ")}
                           </p>
                         )}
+                        {groupSearchSummary.infeasibleOrigins?.length > 0 && (
+                          <p className="text-sub mt-sm">
+                            No flights landing on this date from: {groupSearchSummary.infeasibleOrigins.join(", ")}
+                          </p>
+                        )}
+                        {groupSearchSummary.skippedMixedCurrency > 0 && (
+                          <p className="text-sub mt-sm">
+                            {groupSearchSummary.skippedMixedCurrency} window(s) hidden due to mixed currencies across origins.
+                          </p>
+                        )}
                         <p className="text-sub" style={{ marginTop: 4, fontSize: 12 }}>
-                          ★ marks per-session overrides
+                          ★ Airports marked were manually inputted for this search
                         </p>
                       </div>
                     )}
@@ -1520,10 +1537,23 @@ export default function TripPage() {
                               return { member: m, origin, offer };
                             });
                           const anyAssignable = membersForWindow.some((r) => r.offer);
+                          const startHm = formatHm(win.window_start);
+                          const endHm = formatHm(win.window_end);
+                          const isTopPick = idx === 0;
                           return (
                             <div key={idx} className="card" style={{ padding: 14 }}>
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                                <strong>Arrival {win.window_start} – {win.window_end}</strong>
+                                <div>
+                                  <strong>
+                                    Arrival {startHm} – {endHm}
+                                    {win.end_day_offset > 0 && <sup>+{win.end_day_offset}</sup>}
+                                  </strong>
+                                  <div className="text-sub" style={{ fontSize: 12, marginTop: 2 }}>
+                                    {isTopPick && <span style={{ marginRight: 8 }}>Best balance of cost vs. everyone arriving close together · </span>}
+                                    {win.total_combined} {win.currency} combined
+                                    {" · "}{win.arrival_spread_minutes} min apart
+                                  </div>
+                                </div>
                                 <button
                                   type="button"
                                   className="btn btn-primary btn-sm"
@@ -1548,11 +1578,14 @@ export default function TripPage() {
                                     .map((s) => `${s.marketing_carrier_iata_code || ""}${s.flight_number || ""}`.trim())
                                     .filter(Boolean)
                                     .join(" → ");
+                                  const lastSeg = offer.segments[offer.segments.length - 1];
+                                  const arrHm = lastSeg.arriving_at.slice(11, 16);
                                   return (
                                     <div key={member.user_id} style={{ marginTop: 4 }}>
                                       <strong>{member.display_name}</strong> ({origin}): {offer.total_amount} {offer.total_currency} · {offer.owner_name}
                                       {codes && <> · {codes}</>}
-                                      {" "}· arrives {offer.segments[offer.segments.length - 1].arriving_at.slice(11, 16)}
+                                      {" "}· arrives {arrHm}
+                                      {offer.arrival_day_offset > 0 && <sup>+{offer.arrival_day_offset}</sup>}
                                     </div>
                                   );
                                 })}
