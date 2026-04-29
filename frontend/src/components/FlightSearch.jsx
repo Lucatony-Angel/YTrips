@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { searchFlights, addFlight, addFlightToAll } from "../api/flights";
 import { useAuth } from "../context/AuthContext";
+import AirportInput from "./AirportInput";
 
 const STORAGE_KEY = (tripId, userId) => `flight-search-${tripId}-${userId}`;
 
@@ -118,21 +119,19 @@ export default function FlightSearch({ tripId, destination, tripStartDate, tripE
     <div className="flight-search">
       <div className="flight-search-form">
         <div className="form-group">
-          <label>From (IATA)</label>
-          <input
-            placeholder="e.g. LAX JFK etc"
+          <label>From</label>
+          <AirportInput
+            placeholder="City or IATA (e.g. New York or JFK)"
             value={origin}
-            onChange={(e) => { setOrigin(e.target.value.toUpperCase()); persist("origin", e.target.value.toUpperCase()); }}
-            maxLength={4}
+            onChange={(v) => { setOrigin(v); persist("origin", v); }}
           />
         </div>
         <div className="form-group">
-          <label>To (IATA)</label>
-          <input
-            placeholder="e.g. ORD"
+          <label>To</label>
+          <AirportInput
+            placeholder="City or IATA (e.g. Chicago or ORD)"
             value={dest}
-            onChange={(e) => { setDest(e.target.value.toUpperCase()); persist("dest", e.target.value.toUpperCase()); }}
-            maxLength={4}
+            onChange={(v) => { setDest(v); persist("dest", v); }}
           />
         </div>
         <div className="form-group">

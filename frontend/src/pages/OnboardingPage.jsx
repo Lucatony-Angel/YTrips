@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api from "../api";
 import Navbar from "../components/Navbar";
+import AirportInput from "../components/AirportInput";
 import "../App.css";
 
 export default function OnboardingPage() {
@@ -43,14 +44,12 @@ export default function OnboardingPage() {
           </p>
           <form className="onboarding-form" onSubmit={handleSubmit}>
             <div className="form-group">
-              <label htmlFor="home-airport">Home Airport (IATA code)</label>
-              <input
-                id="home-airport"
-                type="text"
-                placeholder="e.g. JFK, LAX, ORD"
-                maxLength={4}
+              <label htmlFor="home-airport">Home Airport</label>
+              <AirportInput
+                inputId="home-airport"
+                placeholder="Type city or IATA code (e.g. New York or JFK)"
                 value={homeAirport}
-                onChange={(e) => setHomeAirport(e.target.value.toUpperCase())}
+                onChange={setHomeAirport}
               />
             </div>
             {error && <p className="error-text">{error}</p>}

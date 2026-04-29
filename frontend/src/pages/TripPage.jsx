@@ -22,6 +22,7 @@ import {
 import { assignFlightsBulk } from "../api/flights";
 import Navbar from "../components/Navbar";
 import FlightSearch from "../components/FlightSearch";
+import AirportInput from "../components/AirportInput";
 import "../App.css";
 
 const ITINERARY_CATEGORIES = [
@@ -1263,14 +1264,15 @@ export default function TripPage() {
                     <span className="member-home-airport">
                       {editingMyHome ? (
                         <>
-                          <input
-                            type="text"
-                            value={myHomeDraft}
-                            maxLength={4}
-                            onChange={(e) => setMyHomeDraft(e.target.value.toUpperCase())}
-                            style={{ width: 70, padding: "4px 8px", fontSize: 13 }}
-                            autoFocus
-                          />
+                          <div style={{ width: 220 }}>
+                            <AirportInput
+                              value={myHomeDraft}
+                              onChange={setMyHomeDraft}
+                              autoFocus
+                              placeholder="City or IATA"
+                              inputStyle={{ width: "100%", padding: "4px 8px", fontSize: 13 }}
+                            />
+                          </div>
                           <button
                             type="button"
                             className="btn btn-primary btn-xs"
@@ -1332,14 +1334,15 @@ export default function TripPage() {
                           <span className="member-home-airport">
                             {isEditingAirport ? (
                               <>
-                                <input
-                                  type="text"
-                                  value={homeAirportDraft}
-                                  maxLength={4}
-                                  onChange={(e) => setHomeAirportDraft(e.target.value.toUpperCase())}
-                                  style={{ width: 70, padding: "4px 8px", fontSize: 13 }}
-                                  autoFocus
-                                />
+                                <div style={{ width: 220 }}>
+                                  <AirportInput
+                                    value={homeAirportDraft}
+                                    onChange={setHomeAirportDraft}
+                                    autoFocus
+                                    placeholder="City or IATA"
+                                    inputStyle={{ width: "100%", padding: "4px 8px", fontSize: 13 }}
+                                  />
+                                </div>
                                 <button
                                   type="button"
                                   className="btn btn-primary btn-xs"
@@ -1459,14 +1462,12 @@ export default function TripPage() {
                         />
                       </div>
                       <div className="form-group">
-                        <label htmlFor="group-search-dest">Destination (IATA)</label>
-                        <input
-                          id="group-search-dest"
-                          type="text"
-                          maxLength={4}
-                          placeholder="e.g. CDG"
+                        <label htmlFor="group-search-dest">Destination</label>
+                        <AirportInput
+                          inputId="group-search-dest"
+                          placeholder="City or IATA (e.g. Paris or CDG)"
                           value={groupSearchDest}
-                          onChange={(e) => setGroupSearchDest(e.target.value.toUpperCase())}
+                          onChange={setGroupSearchDest}
                         />
                       </div>
                     </div>
