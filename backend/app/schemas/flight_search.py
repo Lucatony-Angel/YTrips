@@ -110,3 +110,26 @@ class GroupWindow(BaseModel):
     currency: str
     options_count_per_origin: dict[str, int]
     best_offer_per_origin: dict[str, FlightOfferRead]
+
+
+# Arrival-anchored response shape (find_group_arrivals).
+class ArrivalOfferRead(FlightOfferRead):
+    arrival_day_offset: int  # 0 if lands on target arrival date, 1 if next day
+
+class GroupArrivalWindow(BaseModel):
+    window_start: str  # ISO datetime, e.g. "2025-09-10T14:00:00"
+    window_end: str    # ISO datetime, may be on target_date + 1
+    end_day_offset: int
+    best_offer_per_origin: dict[str, ArrivalOfferRead]
+    options_count_per_origin: dict[str, int]
+    total_combined: float
+    currency: str
+    arrival_spread_minutes: int
+    score: float        # weighted; lower is better
+    cost_norm: float
+    spread_norm: float
+
+class GroupArrivalsResponse(BaseModel):
+    windows: list[GroupArrivalWindow]
+    skipped_mixed_currency_count: int
+    infeasible_origins: list[str]

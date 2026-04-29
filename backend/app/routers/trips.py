@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -14,9 +14,9 @@ from app.schemas.flight import FlightResponse
 from app.schemas.itinerary import ItineraryItemCreate, ItineraryItemUpdate, ItineraryItemResponse
 from app.models.itinerary_item import ItineraryItem
 from app.services.trip_services import create_trip, get_user_trips
-from app.services.flight_search_services import find_group_windows, GroupSearchError
+from app.services.flight_search_services import find_group_windows, find_group_arrivals, GroupSearchError
 from app.services.airport_registry import is_valid_airport_code
-from app.schemas.flight_search import GroupWindow
+from app.schemas.flight_search import GroupWindow, GroupArrivalsResponse
 from app.models.Itinerary_vote import ItineraryVote
 
 router = APIRouter()
@@ -540,6 +540,78 @@ def group_search_for_trip(
 
     try:
         return find_group_windows(origin_list, dest, departure_date)
+    except GroupSearchError as err:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Flight provider call failed for origin(s): {', '.join(err.failed_origins)}. Please retry.",
+        )
+
+
+@router.get("/{trip_id}/group-arrivals", response_model=GroupArrivalsResponse)
+def group_arrivals_for_trip(
+    trip_id: int,
+    arrival_date: str,
+    destination_iata: str,
+    origins: str | None = None,
+    window_hours: float = 3.0,
+    direct_only: bool = False,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    trip = (
+        db.query(Trip)
+        .join(TripMember, Trip.id == TripMember.trip_id)
+        .filter(Trip.id == trip_id, TripMember.user_id == current_user.id)
+        .first()
+    )
+    if not trip:
+        raise HTTPException(status_code=404, detail="Trip not found")
+
+    dest = destination_iata.strip().upper()
+    if not is_valid_airport_code(dest):
+        raise HTTPException(status_code=400, detail=f"'{dest}' is not a recognized destination airport code")
+
+    if origins:
+        raw = [o.strip().upper() for o in origins.split(",") if o.strip()]
+        invalid = [code for code in raw if not is_valid_airport_code(code)]
+        if invalid:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unrecognized airport code(s): {', '.join(invalid)}",
+            )
+        origin_list = list(set(raw))
+    else:
+        rows = (
+            db.query(TripMember, User)
+            .join(User, TripMember.user_id == User.id)
+            .filter(TripMember.trip_id == trip_id)
+            .all()
+        )
+        origin_list = list({
+            tm.home_airport or u.home_airport
+            for tm, u in rows
+            if (tm.home_airport or u.home_airport)
+        })
+
+    if not origin_list:
+        raise HTTPException(status_code=400, detail="No origins available for group search")
+
+    try:
+        arr_date = date.fromisoformat(arrival_date)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="arrival_date must be in YYYY-MM-DD format")
+    if arr_date < date.today():
+        raise HTTPException(status_code=400, detail="arrival_date cannot be in the past")
+
+    if not (0 < window_hours <= 12):
+        raise HTTPException(status_code=400, detail="window_hours must be in (0, 12]")
+
+    try:
+        return find_group_arrivals(
+            origin_list, dest, arr_date,
+            window_hours=window_hours,
+            direct_only=direct_only,
+        )
     except GroupSearchError as err:
         raise HTTPException(
             status_code=503,
