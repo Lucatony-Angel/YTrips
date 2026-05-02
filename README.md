@@ -9,10 +9,10 @@ cd backend
 python -m venv benv
 source benv/bin/activate
 pip install -r requirements.txt
-uvicorn app.main:app --reload
+python run_https.py
 ```
 
-The API will be available at http://localhost:8000.
+The API will be available at https://localhost:8000.
 
 ### Frontend
 
@@ -22,7 +22,9 @@ npm install
 npm run dev
 ```
 
-The website will be available at http://localhost:5173.
+The website will be available at https://localhost:5173.
+
+Your browser will show a certificate warning because the certificate is self-signed. That is expected for local development.
 
 # Deliverable features implemented
 
@@ -87,4 +89,3 @@ To get the suggestions, it calls a backend endpoint. `GET /api/airports/suggest?
 6. Accents are folded out before matching, so typing "cancun" still finds "Cancún International Airport". You don't have to type weird characters.
 
 If you type something the backend doesn't recognize at all, the dropdown is empty and the form will throw a "not a recognized airport code" validation error on submit, the same as before.
-
