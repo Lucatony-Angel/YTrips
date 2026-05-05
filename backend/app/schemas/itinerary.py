@@ -1,3 +1,6 @@
+# Schemas for itinerary items. ItineraryItemResponse includes yes_votes,
+# no_votes, and the current user's own vote so the frontend can render the
+# voting UI without a separate round-trip.
 from datetime import datetime
 
 from pydantic import BaseModel, Field, field_validator

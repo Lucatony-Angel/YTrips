@@ -1,3 +1,9 @@
+"""
+Database setup — creates the SQLAlchemy engine and session factory.
+The get_db function is used as a FastAPI dependency so each request gets
+its own session that's guaranteed to close when the request is done.
+"""
+
 import os
 
 from dotenv import load_dotenv

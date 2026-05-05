@@ -1,3 +1,5 @@
+// Shown once for new users right after their first login. Just asks for their
+// home airport so the group flight search has somewhere to depart from.
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";

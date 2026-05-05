@@ -1,3 +1,6 @@
+// Landing page after Google OAuth. The backend redirects here with a JWT in
+// the query string. We store it, fetch the user profile, and then send new
+// users to onboarding and returning users straight to the dashboard.
 import { useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";

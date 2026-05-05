@@ -1,3 +1,12 @@
+"""
+Flight endpoints — search, save, and assign flights to trip members.
+
+The three "save" endpoints handle different scenarios:
+  /add        — one person saves a flight for themselves
+  /add-to-all — one person saves the same flight for everyone on the trip
+  /assign-bulk — the group search flow saves one different flight per person in one shot
+"""
+
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 from typing import List
@@ -76,6 +85,8 @@ def add_flight_to_all(
             arrival_airport=flight.arrival_airport,
             departure_time=flight.departure_time,
             arrival_time=flight.arrival_time,
+            total_amount=flight.total_amount,
+            total_currency=flight.total_currency,
         )
         db.add(row)
         created.append(row)
@@ -134,6 +145,8 @@ def assign_flights_bulk(
             arrival_airport=arr,
             departure_time=a.departure_time,
             arrival_time=a.arrival_time,
+            total_amount=a.total_amount,
+            total_currency=a.total_currency,
         )
         db.add(row)
         existing_routes.add((a.user_id, dep, arr))

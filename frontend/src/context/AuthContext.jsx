@@ -1,3 +1,7 @@
+// Holds auth state for the whole app. On mount, we check localStorage for
+// a saved token and verify it with the backend — if it checks out, the user
+// is already logged in. Logout clears the token and hard-navigates to /login
+// so nothing stale sticks around.
 import { createContext, useContext, useEffect, useState } from "react";
 import api from "../api";
 

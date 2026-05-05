@@ -1,3 +1,7 @@
+// Reusable airport typeahead input. As you type, it waits 180ms (debounce)
+// before hitting the backend so we're not firing a request on every keystroke.
+// skipNextFetch prevents the dropdown from re-opening when we programmatically
+// set the value after the user picks something from the list.
 import { useState, useEffect, useRef } from "react";
 import { suggestAirports } from "../api/airports";
 

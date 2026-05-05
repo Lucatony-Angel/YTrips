@@ -1,3 +1,6 @@
+// Root component — sets up the router and wraps everything in AuthProvider
+// so any component can access the current user. Most routes are wrapped in
+// ProtectedRoute which redirects to /login if the user isn't authenticated.
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";

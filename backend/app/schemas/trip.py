@@ -1,3 +1,7 @@
+# Trip request/response shapes. TripCreate checks date order and hex banner
+# color before anything hits the database. TripResponse includes the cached
+# group_window fields so the frontend doesn't have to re-run the group search
+# on every page load.
 from datetime import date, datetime
 from pydantic import BaseModel, Field, field_validator, model_validator
 import re

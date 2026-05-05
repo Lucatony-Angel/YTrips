@@ -1,3 +1,8 @@
+"""
+Business logic for creating and fetching trips. Kept separate from the router
+so the actual database operations aren't tangled up with HTTP handling.
+"""
+
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 

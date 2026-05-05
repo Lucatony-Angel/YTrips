@@ -1,3 +1,5 @@
+// Flight search panel inside the trip page. Saves the last search inputs to
+// localStorage so they survive a page refresh.
 import { useState } from "react";
 import { searchFlights, addFlight, addFlightToAll } from "../api/flights";
 import { useAuth } from "../context/AuthContext";
@@ -85,6 +87,8 @@ export default function FlightSearch({ tripId, destination, tripStartDate, tripE
     arrival_airport: segment.destination,
     departure_time: segment.departing_at,
     arrival_time: segment.arriving_at,
+    total_amount: flight.total_amount ?? null,
+    total_currency: flight.total_currency ?? null,
   });
 
   const handleAddFlight = async (flight, segment) => {

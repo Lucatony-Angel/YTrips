@@ -1,6 +1,12 @@
 """
-One-off migration: adds banner_color and banner_image_url columns to trips table.
-Run once from the backend/ directory:
+One-time migration script — we only run this once from the backend/ directory
+if the database is missing some of the newer columns added over time.
+
+It safely adds things like banner colors, banner images, itinerary items,
+per-member home airports, and the group flight window fields to our existing
+tables. All the ALTER TABLE calls use IF NOT EXISTS, so it's safe to re-run
+without breaking anything.
+
     python migrate.py
 """
 import os
@@ -43,3 +49,5 @@ with engine.begin() as conn:
     conn.execute(text("ALTER TABLE trips ADD COLUMN IF NOT EXISTS group_window_checked_at TIMESTAMP"))
     conn.execute(text("ALTER TABLE trips ADD COLUMN IF NOT EXISTS group_window_combined_price FLOAT"))
     conn.execute(text("ALTER TABLE trips ADD COLUMN IF NOT EXISTS group_window_currency VARCHAR(3)"))
+    conn.execute(text("ALTER TABLE flights ADD COLUMN IF NOT EXISTS total_amount VARCHAR(20)"))
+    conn.execute(text("ALTER TABLE flights ADD COLUMN IF NOT EXISTS total_currency VARCHAR(10)"))

@@ -1,3 +1,5 @@
+// Top navigation bar shown on all authenticated pages. Includes the dark
+// mode toggle, the user's display name, and links to join a trip or sign out.
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import useDarkMode from "../hooks/useDarkMode";

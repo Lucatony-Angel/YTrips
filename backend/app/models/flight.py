@@ -1,3 +1,5 @@
+# Represents a flight that a user has saved to a trip. Members save flights
+# individually, so a trip can have multiple flights — one per person.
 from datetime import datetime
 
 from sqlalchemy import DateTime, ForeignKey, Integer, String
@@ -22,3 +24,6 @@ class Flight(Base):
 
     departure_time: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     arrival_time: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    total_amount: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    total_currency: Mapped[str | None] = mapped_column(String(10), nullable=True)

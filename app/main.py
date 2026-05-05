@@ -1,3 +1,7 @@
+"""
+Entry point for the API. Spins up the FastAPI app and hooks in the routers.
+"""
+
 from fastapi import FastAPI
 from app.routers import health
 

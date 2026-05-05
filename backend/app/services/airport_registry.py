@@ -1,3 +1,9 @@
+"""
+Loads the airports CSV once at startup and provides fuzzy search over it.
+The scoring system boosts major hubs (+25 points) so typing "london" gives
+you LHR before a tiny regional field with "london" in its name.
+"""
+
 import csv
 import unicodedata
 from pathlib import Path

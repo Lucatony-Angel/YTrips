@@ -1,3 +1,5 @@
+# Just one endpoint — the airport typeahead. Delegates all the matching
+# and scoring logic to airport_registry so this file stays minimal.
 from fastapi import APIRouter, Query
 from app.services.airport_registry import search_airports
 

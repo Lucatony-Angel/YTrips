@@ -1,3 +1,6 @@
+# Flight creation and response shapes. FlightCreate checks that airport codes
+# are real and arrival is actually after departure. FlightAssignBulkRequest
+# is for the group search flow — saves one flight per member in one shot.
 from datetime import datetime
 from pydantic import BaseModel, Field, model_validator
 from app.services.airport_registry import is_valid_airport_code
@@ -11,6 +14,8 @@ class FlightCreate(BaseModel):
     arrival_airport: str = Field(..., min_length=3, max_length=4)
     departure_time: datetime
     arrival_time: datetime
+    total_amount: str | None = None
+    total_currency: str | None = None
 
     @model_validator(mode="after")
     def validate_times(self):
@@ -49,6 +54,8 @@ class FlightAssignmentItem(BaseModel):
     arrival_airport: str = Field(..., min_length=3, max_length=4)
     departure_time: datetime
     arrival_time: datetime
+    total_amount: str | None = None
+    total_currency: str | None = None
 
 
 class FlightAssignBulkRequest(BaseModel):

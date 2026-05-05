@@ -1,3 +1,5 @@
+// Main dashboard page. Pretty thin — just a header and the TripDashboard
+// component which does all the actual trip listing work.
 import { useAuth } from "../context/AuthContext";
 import Navbar from "../components/Navbar";
 import TripDashboard from "../components/TripDashboard";

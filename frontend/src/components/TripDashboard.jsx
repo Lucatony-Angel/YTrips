@@ -1,3 +1,6 @@
+// Shows the grid of trip cards on the dashboard. Handles loading, empty state,
+// invite code copying, and delete confirmation in-place so the user doesn't
+// need to navigate away to do any of those things.
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getTrips, deleteTrip } from "../api/trips";

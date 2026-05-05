@@ -1,3 +1,5 @@
+# Just enough to identify someone — Google ID (the stable OAuth identifier),
+# email, display name, avatar, and their home airport for flight search.
 from datetime import datetime, timezone
 from sqlalchemy import DateTime, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column

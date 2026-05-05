@@ -1,3 +1,8 @@
+"""
+This is just a simple health check endpoint. If you hit /health,
+it'll tell you the server is up and running.
+"""
+
 from fastapi import APIRouter
 
 router = APIRouter()

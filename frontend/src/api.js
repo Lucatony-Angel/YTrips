@@ -1,3 +1,6 @@
+// Central axios instance used everywhere in the app. Two interceptors do the
+// heavy lifting: one attaches the JWT to every request, the other redirects
+// to /login automatically if the server says the token is expired or invalid.
 import axios from "axios";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "";

@@ -1,3 +1,9 @@
+"""
+The biggest router in the app. If it involves a trip — creating, joining,
+members, flights, itinerary items, voting, finalization, group search — it's
+probably in here.
+"""
+
 from datetime import date, datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -212,6 +218,8 @@ def join_trip(
 
 
 
+# When everyone on a trip has voted and one item clearly wins, we auto-delete
+# the losing items at the same time slot so the itinerary doesn't stay cluttered.
 def _run_vote_cleanup(db: Session, trip_id: int, item_id: int) -> None:
     """After any vote change, enforce the two auto-cleanup rules."""
     member_count = db.query(TripMember).filter(TripMember.trip_id == trip_id).count()
@@ -469,7 +477,9 @@ def unfinalize_trip(
     return trip
 
 
-# -------- GROUP FLIGHT SEARCH --------
+# Group flight search — finds a time window where all members can land close
+# together. Origins come from each member's home_airport (the trip-level
+# override wins over the user's global setting).
 
 @router.patch("/{trip_id}/members/me/home-airport")
 def set_my_home_airport(

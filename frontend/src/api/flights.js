@@ -1,3 +1,5 @@
+// API calls for flight search and saving. assignFlightsBulk is the one used
+// by the group search flow to save one flight per member in a single request.
 import api from "../api";
 
 export async function searchFlights(data) {

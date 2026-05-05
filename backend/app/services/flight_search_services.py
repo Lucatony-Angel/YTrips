@@ -1,3 +1,15 @@
+"""
+All flight search logic — single-origin and group. Talks to the Duffel API
+and does the work of finding time windows where every traveler has a flight.
+
+There are two group search modes:
+  - find_group_windows: departure-anchored (original). You pick a departure date
+    and it finds arrival windows where everyone lands within the same N hours.
+  - find_group_arrivals: arrival-anchored (v2). You pick a target arrival date
+    and it scores windows by both cost and arrival spread, so tighter groups
+    that are also cheaper rank higher.
+"""
+
 import requests
 import os
 import math
@@ -94,6 +106,7 @@ def basic_flight_search(origin, destination, departure_date, direct_only=False):
     # Duffel returns many offers for the same physical flight (different fare
     # classes/booking codes). Deduplicate by itinerary — the ordered tuple of
     # (flight_number, departing_at) across all segments — keeping the cheapest.
+    # Tuple-key deduplication pattern from Python docs: docs.python.org/3/tutorial/datastructures.html
     seen: dict[tuple, dict] = {}
     for offer in normalized:
         key = tuple((seg["flight_number"], seg["departing_at"]) for seg in offer["segments"])
@@ -195,6 +208,7 @@ def find_group_windows(origins, destination, departure_date, window_hours=3, ste
     def _fetch(origin: str):
         return origin, _search_duffel(origin, destination, departure_date, raise_on_error=True)
 
+    # Parallel fetching via ThreadPoolExecutor — referenced from docs.python.org/3/library/concurrent.futures.html
     max_workers = min(len(unique_origins), 8) or 1
     with ThreadPoolExecutor(max_workers=max_workers) as ex:
         for future in [ex.submit(_fetch, o) for o in unique_origins]:
@@ -217,7 +231,7 @@ def find_group_windows(origins, destination, departure_date, window_hours=3, ste
         for origin, offers in flights_by_origin.items()
     }
 
-    # Step 3: generate sliding windows across 24h
+    # Step 3: generate sliding windows across 24h — sliding window approach from class notes on interval problems
     step = step_minutes / 60
     num_steps = int(24 / step)
     windows = [(i * step, i * step + window_hours) for i in range(num_steps)]
@@ -262,15 +276,14 @@ def find_group_windows(origins, destination, departure_date, window_hours=3, ste
     return results[:10]
 
 
-# ---------------------------------------------------------------------------
 # Arrival-anchored group search (v2). Coexists with find_group_windows above.
-# ---------------------------------------------------------------------------
 
 SCORE_COST_WEIGHT = 0.6
 SCORE_SPREAD_WEIGHT = 0.4
 DEFAULT_TOP_K = 10
 
 
+# Haversine formula from Wikipedia: en.wikipedia.org/wiki/Haversine_formula
 def _haversine_km(a: tuple[float, float], b: tuple[float, float]) -> float:
     lat1, lon1 = math.radians(a[0]), math.radians(a[1])
     lat2, lon2 = math.radians(b[0]), math.radians(b[1])
@@ -458,6 +471,7 @@ def find_group_arrivals(
     # Step 6: collapse windows that pick the exact same offer set — only the
     # earliest+tightest representative survives. Avoids the top-k filling up
     # with shifted copies of the same flight combination.
+    # Using id() to fingerprint in-memory objects — referenced from Python docs on built-in functions
     grouped: dict[tuple, dict] = {}
     for w in feasible:
         key = tuple(sorted(
@@ -472,6 +486,7 @@ def find_group_arrivals(
     survivors = list(grouped.values())
 
     # Step 7: per-search normalization of cost + spread, weighted score, top-k.
+    # Min-max normalization approach from scikit-learn preprocessing docs: scikit-learn.org/stable/modules/preprocessing.html
     costs = [w["total_combined"] for w in survivors]
     spreads = [w["spread_min"] for w in survivors]
     cmin, cmax = min(costs), max(costs)

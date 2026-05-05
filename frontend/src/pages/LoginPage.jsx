@@ -1,3 +1,6 @@
+// Public landing / login page. Explains the app, shows the sign-in button,
+// and has a dark mode toggle so even logged-out users get the full experience.
+// Clicking "Sign in" redirects to the backend's Google OAuth endpoint.
 import { API_BASE_URL } from "../api";
 import "../App.css";
 import useDarkMode from "../hooks/useDarkMode";

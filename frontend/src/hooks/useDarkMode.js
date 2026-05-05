@@ -1,3 +1,6 @@
+// Persists dark/light mode preference in localStorage and applies it by
+// toggling a "dark" class on <html>. The theme-transitioning class is added
+// briefly so the color change animates instead of snapping instantly.
 import { useState, useEffect } from "react";
 
 export default function useDarkMode() {

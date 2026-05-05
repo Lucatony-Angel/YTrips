@@ -1,3 +1,6 @@
+# Records a flight offer that a user selected from a search result. Kept
+# separate from the Flight model so we can store the full offer details
+# (price, currency) alongside the itinerary fields.
 from datetime import date, datetime
 
 from sqlalchemy import Date, DateTime, ForeignKey, Integer, String

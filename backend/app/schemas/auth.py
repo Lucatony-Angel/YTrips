@@ -1,3 +1,5 @@
+# Auth request/response shapes. HomeAirportUpdate validates the airport code
+# against the registry so bad input gets rejected before it hits the database.
 from pydantic import BaseModel, field_validator
 from app.services.airport_registry import is_valid_airport_code
 

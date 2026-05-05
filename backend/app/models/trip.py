@@ -1,3 +1,7 @@
+# A trip has dates, a destination, and an optional arrival window. The
+# invite_code is auto-generated — share it and anyone can join. group_window_*
+# fields cache the best coordinated arrival window so we don't re-run the
+# search every time someone loads the trip page.
 from datetime import date, datetime, timezone
 import uuid
 

@@ -1,3 +1,6 @@
+# Flight search request/response shapes. Two main result types: GroupWindow
+# (departure-anchored, the original approach) and GroupArrivalWindow
+# (arrival-anchored v2, scored by cost + how tight the arrival spread is).
 from datetime import date
 from pydantic import BaseModel, Field, field_validator, model_validator
 from typing import List
@@ -26,7 +29,6 @@ class ArrivalWindow(BaseModel):
             raise ValueError("arrival window 'from' must be before 'to'")
         return self
 
-# request schemas
 class FlightSearchRequest(BaseModel):
     origin: str = Field(..., min_length=3, max_length=4)
     destination: str = Field(..., min_length=3, max_length=4)
@@ -86,7 +88,6 @@ class GroupFlightSearchRequest(BaseModel):
             raise ValueError("departure_date cannot be in the past")
         return v
 
-# response schemas
 class FlightSegmentRead(BaseModel):
     origin: str
     destination: str

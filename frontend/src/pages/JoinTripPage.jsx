@@ -1,3 +1,6 @@
+// Page for joining a trip via invite code. If the code comes in as a URL
+// query param (from a shared link), it's pre-filled. If you're already a
+// member, we handle that gracefully and just navigate to the trip.
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { joinTrip, getTrips } from "../api/trips";

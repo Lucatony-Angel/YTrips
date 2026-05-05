@@ -1,3 +1,8 @@
+"""
+Starts the backend over HTTPS using the self-signed certs in the certs/ folder.
+Use this instead of plain uvicorn so the frontend (also on HTTPS) can talk to it without browser security complaints.
+"""
+
 import os
 from pathlib import Path
 

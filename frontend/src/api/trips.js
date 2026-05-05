@@ -1,3 +1,6 @@
+// All trip-related API calls in one place. groupArrivalsSearch is the v2
+// group flight search — it finds windows where everyone arrives close together,
+// scored by cost and arrival spread.
 import api from "../api";
 
 export async function createTrip(data) {

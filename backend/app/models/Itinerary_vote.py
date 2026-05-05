@@ -1,3 +1,5 @@
+# Tracks yes/no votes on itinerary items. The UniqueConstraint ensures each
+# user can only vote once per item — casting a second vote just updates the first.
 from datetime import datetime
 
 from sqlalchemy import Boolean, ForeignKey, Integer, UniqueConstraint

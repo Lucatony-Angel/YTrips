@@ -1,4 +1,7 @@
-from datetime import datetime
+# An itinerary item is one event or activity on a trip — a restaurant, a hike,
+# a museum visit, etc. Members can propose items and then vote on them if there
+# are conflicts at the same time slot.
+from datetime import datetime, timezone
 
 from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
@@ -19,4 +22,4 @@ class ItineraryItem(Base):
     location: Mapped[str] = mapped_column(String(150), nullable=False)
     category: Mapped[str] = mapped_column(String(80), nullable=False)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)

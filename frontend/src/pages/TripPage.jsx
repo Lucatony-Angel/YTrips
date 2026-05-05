@@ -1,3 +1,6 @@
+// The main trip view — everything about a single trip lives here: member list,
+// flights, itinerary (with voting), group flight search, banner customization,
+// and finalization. It's big because a trip has a lot of moving parts.
 import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -54,6 +57,9 @@ function getErrorMessage(error, fallbackMessage) {
   return typeof detail === "string" ? detail : fallbackMessage;
 }
 
+// Converts an ISO datetime string to the format expected by <input type="datetime-local">.
+// We subtract the timezone offset because datetime-local inputs work in local time,
+// but JS Date objects are UTC internally.
 function toDateTimeLocalValue(value) {
   if (!value) return "";
   const date = new Date(value);
@@ -78,6 +84,8 @@ function formatHm(iso) {
   return iso.slice(11, 16);
 }
 
+// Groups itinerary items by date for the day-by-day view. Items without a
+// valid date fall into an "unscheduled" bucket shown at the bottom.
 function getDateKey(value) {
   if (!value) return "unscheduled";
   const key = String(value).slice(0, 10);
@@ -488,6 +496,8 @@ export default function TripPage() {
         arrival_airport: last.destination,
         departure_time: first.departing_at,
         arrival_time: last.arriving_at,
+        total_amount: offer.total_amount ?? null,
+        total_currency: offer.total_currency ?? null,
       });
     }
     if (assignments.length === 0) {
@@ -808,13 +818,13 @@ export default function TripPage() {
 
     // Itinerary — only items with score (yes - no) >= 0
     sectionHeader("Itinerary");
-    const approvedItems = itineraryItems.filter((item) => (item.yes_votes - item.no_votes) >= 0);
+    const approvedItems = itineraryItems.filter((item) => (item.yes_votes - item.no_votes) >= 0); // score >= 0
     if (approvedItems.length === 0) {
       doc.setTextColor(156, 163, 175);
       doc.text(
         itineraryItems.length === 0
           ? "No itinerary items have been added yet."
-          : "No itinerary items met the approval threshold (score ≥ 0).",
+          : "No itinerary items met the approval threshold (score >= 0).",
         margin + 10, y
       );
       y += 18;
@@ -882,6 +892,128 @@ export default function TripPage() {
       });
     }
 
+    // Page 2 — Trip Cost Summary
+    // Always add this page. Flights without a saved price show "—" and are
+    // excluded from the total. Group priced flights by currency so the sum is meaningful.
+    doc.addPage();
+    y = 52;
+
+    // Page 2 header bar
+    doc.setFillColor(hr, hg, hb);
+    doc.rect(0, 0, pageW, 48, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(18);
+    doc.setFont("helvetica", "bold");
+    doc.text("Flight Cost Summary", margin, 32);
+    y = 80;
+    doc.setTextColor(17, 24, 39);
+
+    if (flights.length === 0) {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(11);
+      doc.setTextColor(156, 163, 175);
+      doc.text("No flights have been added to this trip.", margin + 10, y);
+    } else {
+      // Separate priced vs unpriced
+      const pricedFlights = flights.filter((f) => f.total_amount && f.total_currency);
+      const unpricedFlights = flights.filter((f) => !f.total_amount || !f.total_currency);
+
+      // Group priced flights by currency
+      const byCurrency = {};
+      for (const f of pricedFlights) {
+        if (!byCurrency[f.total_currency]) byCurrency[f.total_currency] = [];
+        byCurrency[f.total_currency].push(f);
+      }
+
+      // Render priced flights grouped by currency
+      Object.entries(byCurrency).forEach(([currency, cFlights]) => {
+        checkPage(28);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(10);
+        doc.setTextColor(hr, hg, hb);
+        doc.text(currency, margin, y);
+        y += 5;
+        doc.setDrawColor(hr, hg, hb);
+        doc.setLineWidth(0.5);
+        doc.line(margin, y, margin + contentW, y);
+        doc.setLineWidth(0.2);
+        doc.setDrawColor(229, 231, 235);
+        y += 16;
+        doc.setTextColor(17, 24, 39);
+
+        let total = 0;
+        cFlights.forEach((f) => {
+          checkPage(20);
+          const memberName = members.find((m) => m.user_id === f.user_id)?.display_name || "Member";
+          const label = `${memberName}  -  ${f.airline} ${f.flight_number}  (${f.departure_airport} to ${f.arrival_airport})`;
+          const price = parseFloat(f.total_amount);
+          total += price;
+          const priceStr = `${currency} ${price.toFixed(2)}`;
+
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(11);
+          doc.setTextColor(17, 24, 39);
+          doc.text(label, margin + 10, y);
+          doc.text(priceStr, pageW - margin - doc.getTextWidth(priceStr), y);
+
+          // Dotted leader line
+          doc.setDrawColor(209, 213, 219);
+          doc.setLineWidth(0.3);
+          const labelEnd = margin + 10 + doc.getTextWidth(label) + 4;
+          const priceStart = pageW - margin - doc.getTextWidth(priceStr) - 4;
+          if (priceStart > labelEnd) {
+            doc.setLineDashPattern([1, 3], 0);
+            doc.line(labelEnd, y - 3, priceStart, y - 3);
+            doc.setLineDashPattern([], 0);
+          }
+          y += 18;
+        });
+
+        // Total line
+        checkPage(28);
+        doc.setDrawColor(17, 24, 39);
+        doc.setLineWidth(0.5);
+        doc.line(margin, y - 4, margin + contentW, y - 4);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(12);
+        const totalStr = `${currency} ${total.toFixed(2)}`;
+        doc.text("Total", margin + 10, y + 8);
+        doc.text(totalStr, pageW - margin - doc.getTextWidth(totalStr), y + 8);
+        doc.setFont("helvetica", "normal");
+        y += 36;
+      });
+
+      // Flights without price info
+      if (unpricedFlights.length > 0) {
+        checkPage(28);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(10);
+        doc.setTextColor(hr, hg, hb);
+        doc.text("No price recorded", margin, y);
+        y += 5;
+        doc.setDrawColor(hr, hg, hb);
+        doc.setLineWidth(0.5);
+        doc.line(margin, y, margin + contentW, y);
+        doc.setLineWidth(0.2);
+        doc.setDrawColor(229, 231, 235);
+        y += 16;
+
+        unpricedFlights.forEach((f) => {
+          checkPage(20);
+          const memberName = members.find((m) => m.user_id === f.user_id)?.display_name || "Member";
+          const label = `${memberName}  -  ${f.airline} ${f.flight_number}  (${f.departure_airport} to ${f.arrival_airport})`;
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(11);
+          doc.setTextColor(17, 24, 39);
+          doc.text(label, margin + 10, y);
+          doc.setTextColor(156, 163, 175);
+          doc.text("—", pageW - margin - doc.getTextWidth("—"), y);
+          doc.setTextColor(17, 24, 39);
+          y += 18;
+        });
+      }
+    }
+
     // Footer on every page
     const totalPages = doc.internal.getNumberOfPages();
     for (let i = 1; i <= totalPages; i++) {
@@ -938,6 +1070,11 @@ export default function TripPage() {
           <div className="flight-times">
             {formatDateTime(flight.departure_time)} → {formatDateTime(flight.arrival_time)}
           </div>
+          {flight.total_amount && (
+            <div className="flight-price" style={{ marginTop: 4 }}>
+              {flight.total_currency} {flight.total_amount}
+            </div>
+          )}
         </div>
         {canDelete && (
           confirmDeleteFlight === flight.id ? (

@@ -1,6 +1,6 @@
 [![Review Assignment Due Date](https://classroom.github.com/assets/deadline-readme-button-22041afd0340ce965d47ae6ef1cefeee28c7c493a6346c4f15d667ab976d596c.svg)](https://classroom.github.com/a/D8kToVOh)
 
-# How to run
+# How to run the app
 
 ### Backend
 
@@ -26,6 +26,42 @@ The website will be available at https://localhost:5173.
 
 Your browser will show a certificate warning because the certificate is self-signed. That is expected for local development.
 
+# Navigating the app
+
+Here's the general flow from the moment you open it for the first time:
+
+**1. Login page (`/login`)**
+The landing page. Hit "Get Started Free" or "Sign in with Google" — both do the same thing and kick off the Google OAuth flow. You'll be redirected to Google to pick your account, then bounced back to the app automatically.
+
+**2. Onboarding (`/onboarding`)**
+First-time users land here after signing in. You just set your home airport (the city you usually fly out of). Type a city name or IATA code into the typeahead, pick from the dropdown, and hit Continue. You only see this page once — returning users skip straight to the dashboard.
+
+**3. Dashboard (`/`)**
+Your home base. Shows a card for every trip you're part of, with the destination, dates, member count, and invite code. From here you can:
+- Click **+ New Trip** to create a trip
+- Click **Join Trip** in the navbar to join someone else's trip with an invite code
+- Click any trip card to open that trip
+
+**4. Create Trip (`/trips/new`)**
+Fill in the trip name, destination, start/end dates, and an optional arrival window (the time range you want everyone to land within). You can also pick a banner color here. Hit Create and you're the owner.
+
+**5. Join Trip (`/join`)**
+Paste in the invite code a trip owner shared with you. If the code is valid and you're not already a member, you're in and immediately redirected to that trip's page. Invite links from the dashboard copy the code directly to your clipboard.
+
+**6. Trip page (`/trips/:id`)**
+The main event. Everything about a single trip lives here, split across four tabs:
+
+- **My Flight** — shows your saved flights and a flight search box. Search by origin, destination, and date, then click "Add to Trip" on any result to save it. There's also a "Direct flights only" toggle and pagination if there are a lot of results. You can delete flights you've added.
+
+- **Group Flights** — the coordinated arrival search. Each member is listed with their home airport (you can override it for this search only). Check the members you want to include, pick an arrival date and destination, and hit "Run group search." It comes back with ranked time windows where everyone has a flight, sorted by cheapest combined price and tightest arrival spread. Click "Assign flights" on a window to save the best offer for each member in one go.
+
+- **Itinerary** — a day-by-day plan. Add items with a title, description, date/time, location, and category. Everyone on the trip can vote yes/no on each item. If two items are scheduled at the same time and all members have voted, the one with more yes votes wins and the other is automatically removed. The owner can finalize the trip, which locks the itinerary.
+
+- **Members** — lists everyone on the trip with their role and home airport.
+
+**7. Finalizing and exporting**
+Once the owner clicks **Finalize** in the trip banner, the itinerary is locked (only the owner can make changes). An **Export PDF** button appears — clicking it generates a two-page PDF in the browser: page 1 is the itinerary, page 2 is a flight cost summary. The owner can also Unlock the trip if plans change.
+
 # Deliverable features implemented
 
 - Group flight search for a trip (extra feature not required for MVP)
@@ -38,7 +74,7 @@ Your browser will show a certificate warning because the certificate is self-sig
 - Basic flight search for a single departure airport and destination 
 
 
-# Timeline
+# Timeline (and our expectations for each)
 
 March 25 - Deadline for MVP
 * User registration and login with session management
@@ -51,15 +87,23 @@ March 25 - Deadline for MVP
 
 
 April 8 - Deadline for alpha version of app:
-* Group flight search: individual results per traveler filtered by the shared arrival window
-*Itinerary items organized into a day-by-day view
-*Polished trip view integrating members, itinerary, and flight search in one page
-*Input validation, error handling, and edge case coverage
-UI/UX refinements across all flows
+* Member list view within a trip + frontend improvements
+* Per-member departure airport entry
+* Add, edit, and remove itinerary items (title, description, date/time, location, category)
+* Upvote/downvote on itinerary items with a vote tally display
 
 April 22 - Deadline for beta version of app
+* Group flight search: individual results per traveler filtered by the shared arrival window
+* Itinerary items organized into a day-by-day view
+* Polished trip view integrating members, itinerary, and flight search in one page
+* Input validation, error handling, and edge case coverage - Luca
+* UI/UX refinements across all flows
 
 May 3 - Deadline for final version of app
+* All Features in the MVP + Alpha + Beta Feature Lists
+* Final UI polish
+* Thorough bug check
+* Demo-ready presentation of full user flow
 
 # Third-party data and APIs
 
@@ -89,3 +133,22 @@ To get the suggestions, it calls a backend endpoint. `GET /api/airports/suggest?
 6. Accents are folded out before matching, so typing "cancun" still finds "Cancún International Airport". You don't have to type weird characters.
 
 If you type something the backend doesn't recognize at all, the dropdown is empty and the form will throw a "not a recognized airport code" validation error on submit, the same as before.
+
+# How the PDF export works
+
+When a trip is finalized, an **Export PDF** button appears in the trip banner. Clicking it generates and downloads a PDF entirely in the browser — no server involved — using [jsPDF](https://github.com/parallax/jsPDF).
+
+The export is built by `buildPDFDoc()` in `frontend/src/pages/TripPage.jsx`. It produces a two-page document:
+
+**Page 1 — Trip Itinerary**
+1. A full-width color header (using the trip's banner color, or the banner image if one is set) with the trip name, destination, dates, and member count.
+2. A **Members** section listing everyone on the trip.
+3. A **Flights** section listing each member's saved flight — airline, flight number, route, and departure/arrival times.
+4. An **Itinerary** section with approved items (score >= 0) grouped by day. Each item shows its time, title, category, location, description summary, and yes/no vote tallies.
+
+**Page 2 — Flight Cost Summary**
+Lists every saved flight with the member's name, airline, flight number, and route on the left, and the price on the right with a dotted leader line between them. Flights are grouped by currency so the per-currency total is always meaningful (summing USD and GBP would be nonsensical). Flights added before cost tracking was introduced show a `—` in a separate "No price recorded" section. A bold **Total** line closes each currency group.
+
+A footer with the trip name and page number is stamped on every page after the document is fully assembled.
+
+One gotcha worth knowing: jsPDF's built-in Helvetica font only covers basic ASCII. Any Unicode character outside that range (like `≥`) renders as garbage, so the code uses plain ASCII equivalents (`>=`) wherever it needs to render text in the PDF.

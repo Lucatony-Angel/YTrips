@@ -1,3 +1,8 @@
+"""
+JWT auth helpers and Google OAuth config. Everything that touches tokens or
+"who is this user?" lives here so the routers stay clean.
+"""
+
 import os
 from datetime import datetime, timedelta, timezone
 
