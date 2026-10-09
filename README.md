@@ -1,6 +1,39 @@
-[![Review Assignment Due Date](https://classroom.github.com/assets/deadline-readme-button-22041afd0340ce965d47ae6ef1cefeee28c7c493a6346c4f15d667ab976d596c.svg)](https://classroom.github.com/a/D8kToVOh)
+# YTrips
+
+YTrips is a group trip planner. Friends flying in from different cities create a shared trip, find flights that land everyone within the same arrival window, vote on a day-by-day itinerary, and export the final plan as a PDF.
+
+![A trip page on the Group Flights tab, with three members flying from different home airports](docs/screenshot-trip.png)
+
+*Setting up a group search: each member's home airport, the arrival date and the destination.*
+
+![Group search results: ranked arrival windows with a flight and price for each member](docs/screenshot-group-flights.png)
+
+*The results: arrival windows ranked by combined price and how close together everyone lands.*
+
+# Stack
+
+- **Frontend** — React 19, Vite, React Router, Axios, react-day-picker, jsPDF
+- **Backend** — Python, FastAPI, SQLAlchemy, Pydantic, Uvicorn
+- **Database** — PostgreSQL
+- **Auth** — Google OAuth 2.0 sign-in, JWT sessions
+- **Flight data** — Duffel Flights API
 
 # How to run the app
+
+### Environment variables
+
+The backend reads its configuration from a `.env` file in `backend/` (not committed). Create one with:
+
+```bash
+DATABASE_URL=postgresql://user:password@localhost:5432/ytrips
+GOOGLE_CLIENT_ID=your-google-oauth-client-id
+GOOGLE_CLIENT_SECRET=your-google-oauth-client-secret
+GOOGLE_REDIRECT_URI=https://localhost:8000/api/auth/google/callback
+JWT_SECRET=a-long-random-string
+DUFFEL_TEST_KEY=your-duffel-test-key
+```
+
+Optional: `DUFFEL_LIVE_KEY` together with `ENVIRONMENT=live` switches flight search from Duffel's test data to live offers, and `FRONTEND_URL` overrides where the backend redirects after login (defaults to `https://localhost:5173`).
 
 ### Backend
 
@@ -62,48 +95,17 @@ The main event. Everything about a single trip lives here, split across four tab
 **7. Finalizing and exporting**
 Once the owner clicks **Finalize** in the trip banner, the itinerary is locked (only the owner can make changes). An **Export PDF** button appears — clicking it generates a two-page PDF in the browser: page 1 is the itinerary, page 2 is a flight cost summary. The owner can also Unlock the trip if plans change.
 
-# Deliverable features implemented
+# Features
 
-- Group flight search for a trip (extra feature not required for MVP)
-- User registration and login with session management 
-- Create a trip (name, destination, dates, arrival window) 
-- Dashboard showing all trips a user belongs to 
-- Generate a unique invite code per trip 
-- Join a trip via the invite link 
-- Basic database with all core tables and many-to-many relationships
-- Basic flight search for a single departure airport and destination 
-
-
-# Timeline (and our expectations for each)
-
-March 25 - Deadline for MVP
-* User registration and login with session management
-* Create a trip (name, destination, dates, arrival window) 
-* Dashboard showing all trips a user belongs to 
-* Generate a unique invite code per trip 
-* Join a trip via the invite link 
-* Basic database with all core tables and many-to-many relationships
-* Basic flight search for a single departure airport and destination 
-
-
-April 8 - Deadline for alpha version of app:
-* Member list view within a trip + frontend improvements
-* Per-member departure airport entry
-* Add, edit, and remove itinerary items (title, description, date/time, location, category)
-* Upvote/downvote on itinerary items with a vote tally display
-
-April 22 - Deadline for beta version of app
-* Group flight search: individual results per traveler filtered by the shared arrival window
-* Itinerary items organized into a day-by-day view
-* Polished trip view integrating members, itinerary, and flight search in one page
-* Input validation, error handling, and edge case coverage - Luca
-* UI/UX refinements across all flows
-
-May 3 - Deadline for final version of app
-* All Features in the MVP + Alpha + Beta Feature Lists
-* Final UI polish
-* Thorough bug check
-* Demo-ready presentation of full user flow
+- Sign in with Google, with session management
+- Create a trip with a name, destination, dates and arrival window
+- Dashboard showing every trip you belong to
+- Unique invite code per trip, and joining a trip by code or invite link
+- Flight search for a single departure airport and destination
+- Group flight search that finds arrival windows where every member has a flight
+- Airport typeahead that accepts city names as well as IATA codes
+- Shared day-by-day itinerary with yes/no voting on each item
+- Finalize a trip to lock the itinerary, then export it as a PDF
 
 # Third-party data and APIs
 
@@ -152,3 +154,10 @@ Lists every saved flight with the member's name, airline, flight number, and rou
 A footer with the trip name and page number is stamped on every page after the document is fully assembled.
 
 One gotcha worth knowing: jsPDF's built-in Helvetica font only covers basic ASCII. Any Unicode character outside that range (like `≥`) renders as garbage, so the code uses plain ASCII equivalents (`>=`) wherever it needs to render text in the PDF.
+
+# Team
+
+- **Lucatony Angel** ([@Lucatony-Angel](https://github.com/Lucatony-Angel)) — project lead
+- **Rico Chandra**
+- **Rishi Sankhe**
+- **Yejun Yun**
